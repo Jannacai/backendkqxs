@@ -5,10 +5,13 @@ const NodeCache = require('node-cache');
 
 const token = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN';
 const bot = new TelegramBot(token);
-const BASE_API_URL = 'https://backendkqxs.onrender.com/api/kqxs/xsmb'; // Cập nhật BASE_API_URL để trỏ đúng đến /xsmb
+const BASE_API_URL = 'https://backendkqxs.onrender.com/api/kqxs'; // Đúng với cấu hình API
 
 // Khởi tạo cache với thời gian sống (TTL) là 1 giờ
 const cache = new NodeCache({ stdTTL: 3600 });
+
+// Cache để ngăn lặp thông báo lỗi
+const errorCache = new NodeCache({ stdTTL: 60 });
 
 // Hàm hỗ trợ parse ngày
 const parseDate = (dateStr) => {
@@ -19,22 +22,35 @@ const parseDate = (dateStr) => {
     if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > new Date().getFullYear()) {
         throw new Error('Ngày, tháng hoặc năm không hợp lệ.');
     }
-    return dateStr; // Trả về chuỗi định dạng DD-MM-YYYY để gửi API
+    return dateStr;
 };
 
 router.post('/', async (req, res) => {
     const update = req.body;
+    // Phản hồi HTTP 200 ngay để tránh Telegram gửi lại cập nhật
+    res.status(200).send('OK');
+
     try {
         if (!update.message || !update.message.text) {
-            return res.status(200).send('OK');
+            console.log('Webhook không có message hoặc text');
+            return;
         }
 
         const chatId = update.message.chat.id;
+        const messageId = update.message.message_id;
         const text = update.message.text.trim();
         const command = text.split(' ')[0].toLowerCase();
         const args = text.split(' ').slice(1);
 
-        const sendLongMessage = async (chatId, text) => {
+        // Ngăn xử lý tin nhắn lặp
+        const messageKey = `${chatId}:${messageId}`;
+        if (cache.get(messageKey)) {
+            console.log(`Bỏ qua tin nhắn lặp: ${messageKey}`);
+            return;
+        }
+        cache.set(messageKey, true, 300);
+
+        const send，长Message = async (chatId, text) => {
             const maxLength = 4096;
             const messages = [];
             for (let i = 0; i < text.length; i += maxLength) {
@@ -46,32 +62,38 @@ router.post('/', async (req, res) => {
         const callApi = async (endpoint, params = {}) => {
             const query = new URLSearchParams(params).toString();
             const url = `${BASE_API_URL}${endpoint}${query ? '?' + query : ''}`;
+            console.log(`Gọi API: ${url}`);
             const cacheKey = url;
 
-            // Kiểm tra cache trước khi gọi API
             const cachedData = cache.get(cacheKey);
             if (cachedData) {
+                console.log(`Lấy dữ liệu từ cache: ${cacheKey}`);
                 return cachedData;
             }
 
             const response = await fetch(url, {
                 headers: { 'x-user-id': 'bot' },
                 method: 'GET',
-                timeout: 5000,
+                signal: AbortSignal.timeout(5000),
             });
 
             if (response.status !== 200) {
+                console.error(`Lỗi API ${url}: ${response.statusText}`);
                 throw new Error(`Lỗi khi gọi API ${endpoint}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            cache.set(cacheKey, data); // Lưu vào cache
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+                throw new Error(`Không tìm thấy dữ liệu từ API ${endpoint}`);
+            }
+
+            cache.set(cacheKey, data);
+            console.log(`Lưu cache: ${cacheKey}`);
             return data;
         };
 
         switch (command) {
             case '/start':
-                // Giữ nguyên logic /start
                 const imageUrl = 'https://i.ibb.co/H29L7WL/460.jpg';
                 const welcomeMessage = `
 💎[TIN888 UY TÍN TẠO NIỀM TIN](https://tin888vn.online/)💎
@@ -120,6 +142,7 @@ router.post('/', async (req, res) => {
                         await sendLongMessage(chatId, welcomeMessage.slice(1024));
                     }
                 } catch (photoError) {
+                    console.error('Lỗi gửi ảnh:', photoError.message);
                     await bot.sendMessage(chatId, 'Không thể gửi ảnh, nhưng bạn vẫn có thể khám phá TIN888!', {
                         parse_mode: 'Markdown',
                         reply_markup: inlineKeyboard
@@ -129,21 +152,22 @@ router.post('/', async (req, res) => {
                 break;
 
             case '/xsmb':
-                const xsmbData = await callApi('');
-                if (!xsmbData || xsmbData.length === 0) {
-                    await bot.sendMessage(chatId, 'Không tìm thấy kết quả XSMB.');
-                    break;
+                try {
+                    const xsmbData = await callApi('/xsmb');
+                    const latestResult = xsmbData[0];
+                    const drawDate = new Date(latestResult.drawDate).toLocaleDateString('vi-VN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+                    const resultText = `Kết quả XSMB ngày ${drawDate}:\n` +
+                        `Đặc biệt: ${latestResult.specialPrize?.[0] || 'Chưa có'}\n` +
+                        `Giải nhất: ${latestResult.firstPrize?.[0] || 'Chưa có'}`;
+                    await bot.sendMessage(chatId, resultText);
+                } catch (error) {
+                    console.error('Lỗi lệnh /xsmb:', error.message);
+                    await bot.sendMessage(chatId, `Lỗi khi lấy kết quả XSMB: ${error.message}`);
                 }
-                const latestResult = xsmbData[0];
-                const drawDate = new Date(latestResult.drawDate).toLocaleDateString('vi-VN', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                });
-                const resultText = `Kết quả XSMB ngày ${drawDate}:\n` +
-                    `Đặc biệt: ${latestResult.specialPrize_0 || 'Chưa có'}\n` +
-                    `Giải nhất: ${latestResult.firstPrize_0 || 'Chưa có'}`;
-                await bot.sendMessage(chatId, resultText);
                 break;
 
             case '/range':
@@ -155,24 +179,20 @@ router.post('/', async (req, res) => {
                 try {
                     startDate = parseDate(startDate);
                     endDate = parseDate(endDate);
+                    const rangeData = await callApi('/xsmb/range', { startDate, endDate });
+                    const rangeText = rangeData.map(result => {
+                        const drawDate = new Date(result.drawDate).toLocaleDateString('vi-VN', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                        });
+                        return `Ngày ${drawDate}: Đặc biệt: ${result.specialPrize?.[0] || 'Chưa có'}`;
+                    }).join('\n');
+                    await sendLongMessage(chatId, rangeText || 'Không tìm thấy kết quả.');
                 } catch (error) {
-                    await bot.sendMessage(chatId, error.message);
-                    break;
+                    console.error('Lỗi lệnh /range:', error.message);
+                    await bot.sendMessage(chatId, `Lỗi khi lấy kết quả khoảng thời gian: ${error.message}`);
                 }
-                const rangeData = await callApi('/range', { startDate, endDate });
-                if (rangeData.error) {
-                    await bot.sendMessage(chatId, rangeData.error);
-                    break;
-                }
-                const rangeText = rangeData.map(result => {
-                    const drawDate = new Date(result.drawDate).toLocaleDateString('vi-VN', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    });
-                    return `Ngày ${drawDate}: Đặc biệt: ${result.specialPrize_0 || 'Chưa có'}`;
-                }).join('\n');
-                await sendLongMessage(chatId, rangeText || 'Không tìm thấy kết quả.');
                 break;
 
             case '/statistics':
@@ -190,13 +210,14 @@ router.post('/', async (req, res) => {
                     await bot.sendMessage(chatId, 'Số ngày phải là số nguyên dương.');
                     break;
                 }
-                const statData = await callApi(`/statistics/${statType}`, { days });
-                if (statData.error) {
-                    await bot.sendMessage(chatId, statData.error);
-                    break;
+                try {
+                    const statData = await callApi(`/xsmb/statistics/${statType}`, { days });
+                    const statText = JSON.stringify(statData, null, 2).slice(0, 4000);
+                    await sendLongMessage(chatId, `Thống kê ${statType} (${days} ngày):\n${statText}`);
+                } catch (error) {
+                    console.error(`Lỗi lệnh /statistics ${statType}:`, error.message);
+                    await bot.sendMessage(chatId, `Lỗi khi lấy thống kê ${statType}: ${error.message}`);
                 }
-                const statText = JSON.stringify(statData, null, 2).slice(0, 4000);
-                await sendLongMessage(chatId, `Thống kê ${statType} (${days} ngày):\n${statText}`);
                 break;
 
             case '/soicau':
@@ -208,37 +229,36 @@ router.post('/', async (req, res) => {
                 try {
                     scStartDate = parseDate(scStartDate);
                     scEndDate = parseDate(scEndDate);
+                    const validDays = [3, 5, 7, 10, 14];
+                    if (!validDays.includes(parseInt(scDays))) {
+                        await bot.sendMessage(chatId, 'Số ngày không hợp lệ. Chỉ chấp nhận: 3, 5, 7, 10, 14.');
+                        break;
+                    }
+                    const soicauData = await callApi('/xsmb/soicau/bach-thu/range', { startDate: scStartDate, endDate: scEndDate, days: scDays });
+                    const soicauText = soicauData.map(result =>
+                        `Ngày ${result.date}: ${JSON.stringify(result.predictions)}`
+                    ).join('\n');
+                    await sendLongMessage(chatId, soicauText || 'Không tìm thấy kết quả soi cầu.');
                 } catch (error) {
-                    await bot.sendMessage(chatId, error.message);
-                    break;
+                    console.error('Lỗi lệnh /soicau:', error.message);
+                    await bot.sendMessage(chatId, `Lỗi khi lấy kết quả soi cầu: ${error.message}`);
                 }
-                const validDays = [3, 5, 7, 10, 14];
-                if (!validDays.includes(parseInt(scDays))) {
-                    await bot.sendMessage(chatId, 'Số ngày không hợp lệ. Chỉ chấp nhận: 3, 5, 7, 10, 14.');
-                    break;
-                }
-                const soicauData = await callApi('/soicau/bach-thu/range', { startDate: scStartDate, endDate: scEndDate, days: scDays });
-                if (soicauData.error) {
-                    await bot.sendMessage(chatId, soicauData.error);
-                    break;
-                }
-                const soicauText = soicauData.map(result =>
-                    `Ngày ${result.date}: ${JSON.stringify(result.predictions)}`
-                ).join('\n');
-                await sendLongMessage(chatId, soicauText || 'Không tìm thấy kết quả soi cầu.');
                 break;
 
             default:
-                await bot.sendMessage(chatId, 'Lệnh không hợp lệ. Gõ /start để xem danh sách lệnh.');
+                await bot.sendMessage(chatId, 'Lệnh không hợp lệ. Các lệnh khả dụng:\n' +
+                    '/start - Xem thông tin và ưu đãi\n' +
+                    '/xsmb - Xem kết quả XSMB mới nhất\n' +
+                    '/range <startDate> <endDate> - Xem kết quả trong khoảng thời gian\n' +
+                    '/statistics <type> [days] - Xem thống kê (gan, special, dau-duoi, tan-suat-loto)\n' +
+                    '/soicau <startDate> <endDate> <days> - Xem soi cầu bạch thủ');
         }
-
-        return res.status(200).send('OK');
     } catch (error) {
         console.error('Lỗi xử lý webhook Telegram:', error.message);
-        if (update?.message?.chat) {
+        if (update?.message?.chat && !errorCache.get(`${update.message.chat.id}:error`)) {
             await bot.sendMessage(update.message.chat.id, 'Có lỗi xảy ra, vui lòng thử lại sau.');
+            errorCache.set(`${update.message.chat.id}:error`, true, 60);
         }
-        return res.status(500).send('Internal Server Error');
     }
 });
 
