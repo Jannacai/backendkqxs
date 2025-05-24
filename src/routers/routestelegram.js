@@ -1,14 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const TelegramBot = require('node-telegram-bot-api');
-const NodeCache = require('node-cache'); // Thêm thư viện caching
+const NodeCache = require('node-cache');
 
-const token = process.env.TELEGRAM_BOT_TOKEN || '7789171652:AAEmz2GIO5WECWE2K1o-d6bve3vdvFctLCg';
+const token = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN';
 const bot = new TelegramBot(token);
-const BASE_API_URL = 'https://backendkqxs.onrender.com/api/kqxs';
+const BASE_API_URL = 'https://backendkqxs.onrender.com/api/kqxs/xsmb'; // Cập nhật BASE_API_URL để trỏ đúng đến /xsmb
 
 // Khởi tạo cache với thời gian sống (TTL) là 1 giờ
 const cache = new NodeCache({ stdTTL: 3600 });
+
+// Hàm hỗ trợ parse ngày
+const parseDate = (dateStr) => {
+    if (!dateStr || !/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+        throw new Error('Định dạng ngày không hợp lệ. Vui lòng sử dụng DD-MM-YYYY.');
+    }
+    const [day, month, year] = dateStr.split('-').map(Number);
+    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > new Date().getFullYear()) {
+        throw new Error('Ngày, tháng hoặc năm không hợp lệ.');
+    }
+    return dateStr; // Trả về chuỗi định dạng DD-MM-YYYY để gửi API
+};
 
 router.post('/', async (req, res) => {
     const update = req.body;
@@ -45,7 +57,7 @@ router.post('/', async (req, res) => {
             const response = await fetch(url, {
                 headers: { 'x-user-id': 'bot' },
                 method: 'GET',
-                timeout: 5000, // Thêm timeout để tránh chờ quá lâu
+                timeout: 5000,
             });
 
             if (response.status !== 200) {
@@ -59,6 +71,7 @@ router.post('/', async (req, res) => {
 
         switch (command) {
             case '/start':
+                // Giữ nguyên logic /start
                 const imageUrl = 'https://i.ibb.co/H29L7WL/460.jpg';
                 const welcomeMessage = `
 💎[TIN888 UY TÍN TẠO NIỀM TIN](https://tin888vn.online/)💎
@@ -97,7 +110,6 @@ router.post('/', async (req, res) => {
                 };
 
                 try {
-                    // Bỏ kiểm tra URL ảnh để giảm độ trễ
                     await bot.sendPhoto(chatId, imageUrl, {
                         caption: welcomeMessage.length > 1024 ? welcomeMessage.slice(0, 1024) : welcomeMessage,
                         parse_mode: 'Markdown',
@@ -117,15 +129,20 @@ router.post('/', async (req, res) => {
                 break;
 
             case '/xsmb':
-                const xsmbData = await callApi('/xsmb');
+                const xsmbData = await callApi('');
                 if (!xsmbData || xsmbData.length === 0) {
                     await bot.sendMessage(chatId, 'Không tìm thấy kết quả XSMB.');
                     break;
                 }
                 const latestResult = xsmbData[0];
-                const resultText = `Kết quả XSMB ngày ${new Date(latestResult.drawDate).toLocaleDateString('vi-VN')}:\n` +
-                    `Đặc biệt: ${latestResult.specialPrize[0] || 'Chưa có'}\n` +
-                    `Giải nhất: ${latestResult.firstPrize[0] || 'Chưa có'}`;
+                const drawDate = new Date(latestResult.drawDate).toLocaleDateString('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+                const resultText = `Kết quả XSMB ngày ${drawDate}:\n` +
+                    `Đặc biệt: ${latestResult.specialPrize_0 || 'Chưa có'}\n` +
+                    `Giải nhất: ${latestResult.firstPrize_0 || 'Chưa có'}`;
                 await bot.sendMessage(chatId, resultText);
                 break;
 
@@ -134,15 +151,27 @@ router.post('/', async (req, res) => {
                     await bot.sendMessage(chatId, 'Vui lòng cung cấp startDate và endDate. Ví dụ: /range 01-05-2025 05-05-2025');
                     break;
                 }
-                const [startDate, endDate] = args;
+                let [startDate, endDate] = args;
+                try {
+                    startDate = parseDate(startDate);
+                    endDate = parseDate(endDate);
+                } catch (error) {
+                    await bot.sendMessage(chatId, error.message);
+                    break;
+                }
                 const rangeData = await callApi('/range', { startDate, endDate });
                 if (rangeData.error) {
                     await bot.sendMessage(chatId, rangeData.error);
                     break;
                 }
-                const rangeText = rangeData.map(result =>
-                    `Ngày ${new Date(result.drawDate).toLocaleDateString('vi-VN')}: Đặc biệt: ${result.specialPrize[0] || 'Chưa có'}`
-                ).join('\n');
+                const rangeText = rangeData.map(result => {
+                    const drawDate = new Date(result.drawDate).toLocaleDateString('vi-VN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+                    return `Ngày ${drawDate}: Đặc biệt: ${result.specialPrize_0 || 'Chưa có'}`;
+                }).join('\n');
                 await sendLongMessage(chatId, rangeText || 'Không tìm thấy kết quả.');
                 break;
 
@@ -155,6 +184,10 @@ router.post('/', async (req, res) => {
                 const validStatTypes = ['gan', 'special', 'dau-duoi', 'tan-suat-loto'];
                 if (!validStatTypes.includes(statType)) {
                     await bot.sendMessage(chatId, 'Loại thống kê không hợp lệ. Chọn: gan, special, dau-duoi, tan-suat-loto.');
+                    break;
+                }
+                if (!/^\d+$/.test(days) || parseInt(days) < 1) {
+                    await bot.sendMessage(chatId, 'Số ngày phải là số nguyên dương.');
                     break;
                 }
                 const statData = await callApi(`/statistics/${statType}`, { days });
@@ -171,7 +204,19 @@ router.post('/', async (req, res) => {
                     await bot.sendMessage(chatId, 'Vui lòng cung cấp startDate, endDate và days. Ví dụ: /soicau 01-05-2025 05-05-2025 7');
                     break;
                 }
-                const [scStartDate, scEndDate, scDays] = args;
+                let [scStartDate, scEndDate, scDays] = args;
+                try {
+                    scStartDate = parseDate(scStartDate);
+                    scEndDate = parseDate(scEndDate);
+                } catch (error) {
+                    await bot.sendMessage(chatId, error.message);
+                    break;
+                }
+                const validDays = [3, 5, 7, 10, 14];
+                if (!validDays.includes(parseInt(scDays))) {
+                    await bot.sendMessage(chatId, 'Số ngày không hợp lệ. Chỉ chấp nhận: 3, 5, 7, 10, 14.');
+                    break;
+                }
                 const soicauData = await callApi('/soicau/bach-thu/range', { startDate: scStartDate, endDate: scEndDate, days: scDays });
                 if (soicauData.error) {
                     await bot.sendMessage(chatId, soicauData.error);
