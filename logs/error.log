@@ -1,0 +1,3351 @@
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:13:38: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:14:31: Lỗi khi khởi động scraper ngày 26/04/2025: Lock file is already being held
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:29: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:32: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:35: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 18:25:39: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+Error: Socket closed unexpectedly
+    at Socket.<anonymous> (D:\Dự ÁN XỔ SỐ\KQ_XoSo_Nhap\node_modules\@redis\client\dist\lib\client\socket.js:194:118)
+    at Object.onceWrapper (node:events:633:26)
+    at Socket.emit (node:events:518:28)
+    at TCP.<anonymous> (node:net:337:12)
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+2025-04-26 20:24:17: Lỗi kết nối Redis: AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1116:18)
+    at afterConnectMultiple (node:net:1683:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 6379
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:6379
+        at createConnectionError (node:net:1646:14)
+        at afterConnectMultiple (node:net:1676:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
