@@ -13,16 +13,16 @@ mongoose.connect(process.env.MONGODB_URI)
 // Hàm chuyển đổi tên tỉnh sang dạng kebab-case, hỗ trợ tiếng Việt
 function toKebabCase(str) {
     return str
-        .normalize('NFD') // Chuẩn hóa Unicode (tách dấu)
-        .replace(/[\u0300-\u036f]/g, '') // Xóa các dấu thanh
-        .replace(/đ/g, 'd') // Thay "đ" bằng "d"
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
         .replace(/Đ/g, 'D')
         .toLowerCase()
-        .replace(/\s+/g, '-') // Thay khoảng trắng bằng dấu gạch ngang
-        .replace(/[^a-z0-9-]/g, ''); // Xóa ký tự không hợp lệ
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
 }
 
-// Định nghĩa schema cho kết quả xổ số miền Nam
+// Định nghĩa schema cho kết quả xổ số miền Trung
 const xsmtSchema = new mongoose.Schema({
     drawDate: { type: Date, required: true },
     dayOfWeek: { type: String },
@@ -47,6 +47,7 @@ const xsmtSchema = new mongoose.Schema({
         { key: { drawDate: 1, station: 1, tentinh: 1 }, unique: true },
         { key: { drawDate: -1 } },
         { key: { tentinh: 1 } },
+        { key: { slug: 1 }, unique: true }, // Thêm chỉ số slug với unique
     ],
 });
 
@@ -291,7 +292,8 @@ async function scrapeXSMT(date, station) {
                     const daysOfWeek = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
                     const dayOfWeek = daysOfWeek[dateObj.getDay()];
                     const tinh = toKebabCase(tentinh);
-                    const slug = `xsmt-${drawDate.replace(/\//g, '-')}`; // Thêm tinh vào slug để đảm bảo duy nhất
+                    // Sửa slug để bao gồm tỉnh, ví dụ: xsmt-24-05-2025-khanh-hoa
+                    const slug = `xsmt-${drawDate.replace(/\//g, '-')}-${tinh}`;
 
                     const result = {
                         drawDate,
@@ -398,7 +400,7 @@ async function saveToMongoDB(result) {
                     { drawDate: dateObj, station: result.station, tentinh: result.tentinh },
                     { $set: result }
                 );
-                console.log(`Đã cập nhật kết quả ngày ${result.drawDate.toISOString().split('T')[0]} cho  : ${result.tentinh}`);
+                console.log(`Đã cập nhật kết quả ngày ${result.drawDate.toISOString().split('T')[0]} cho tỉnh: ${result.tentinh}`);
             } else {
                 console.log(`Dữ liệu ngày ${result.drawDate.toISOString().split('T')[0]} cho tỉnh ${result.tentinh} không thay đổi`);
             }
@@ -438,16 +440,44 @@ async function saveToMongoDB(result) {
                 const newDataString = JSON.stringify(newData);
 
                 if (latestDataString !== newDataString) {
-                    const newResult = new XSMT(result);
-                    await newResult.save();
-                    console.log(`Đã lưu kết quả mới ngày ${result.drawDate.toISOString().split('T')[0]} cho tỉnh ${result.tentinh}`);
+                    let retryCount = 0;
+                    while (retryCount < 3) {
+                        try {
+                            const newResult = new XSMT(result);
+                            await newResult.save();
+                            console.log(`Đã lưu kết quả mới ngày ${result.drawDate.toISOString().split('T')[0]} cho tỉnh ${result.tentinh}`);
+                            break;
+                        } catch (error) {
+                            if (error.code === 11000 && error.keyPattern?.slug && retryCount < 3) {
+                                retryCount++;
+                                result.slug = `xsmt-${drawDate.replace(/\//g, '-')}-${tinh}-${retryCount}`;
+                                console.log(`Xung đột slug, thử lại với slug mới: ${result.slug}`);
+                            } else {
+                                throw error;
+                            }
+                        }
+                    }
                 } else {
                     console.log(`Dữ liệu ngày ${result.drawDate.toISOString().split('T')[0]} cho tỉnh ${result.tentinh} không thay đổi so với ngày gần nhất`);
                 }
             } else {
-                const newResult = new XSMT(result);
-                await newResult.save();
-                console.log(`Đã lưu kết quả mới ngày ${result.drawDate.toISOString().split('T')[0]} cho tỉnh ${result.tentinh} (không có dữ liệu trước đó)`);
+                let retryCount = 0;
+                while (retryCount < 3) {
+                    try {
+                        const newResult = new XSMT(result);
+                        await newResult.save();
+                        console.log(`Đã lưu kết quả mới ngày ${result.drawDate.toISOString().split('T')[0]} cho tỉnh ${result.tentinh} (không có dữ liệu trước đó)`);
+                        break;
+                    } catch (error) {
+                        if (error.code === 11000 && error.keyPattern?.slug && retryCount < 3) {
+                            retryCount++;
+                            result.slug = `xsmt-${drawDate.replace(/\//g, '-')}-${tinh}-${retryCount}`;
+                            console.log(`Xung đột slug, thử lại với slug mới: ${result.slug}`);
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
             }
         }
     } catch (error) {
@@ -455,11 +485,11 @@ async function saveToMongoDB(result) {
     }
 }
 
-// Lên lịch chạy tự động lúc 16h45 hàng ngày
-schedule.scheduleJob('45 16 * * *', () => {
+// Lên lịch chạy tự động lúc 17h00 hàng ngày
+schedule.scheduleJob('0 17 * * *', () => {
     console.log('Bắt đầu cào dữ liệu XSMT...');
     const today = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    scrapeXSMT(today, 'xsmt')
+    scrapeXSMT(today, 'xsmt');
 });
 
 // Chạy thủ công nếu có tham số dòng lệnh

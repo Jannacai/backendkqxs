@@ -27,13 +27,13 @@ if (!fs.existsSync(uploadsDir)) {
 // Phục vụ file tĩnh từ thư mục uploads
 app.use('/uploads', express.static(uploadsDir, {
     setHeaders: (res, filePath) => {
-        res.setHeader('Access-Control-Allow-Origin', 'https://xsmb.win');
+        res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
     },
 }));
 
 // Khởi tạo middleware
 app.use(cors({
-    origin: 'https://xsmb.win', // Giới hạn origin để tăng bảo mật
+    origin: 'http://localhost:3000', // Giới hạn origin để tăng bảo mật
     methods: ['GET', 'POST'], // Chỉ cho phép các phương thức cần thiết
 }));
 app.use(compression());
