@@ -19,7 +19,7 @@ app.set('trust proxy', 1);
 // Tạo thư mục uploads nếu chưa tồn tại
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(UploadsDir);
+    fs.mkdirSync(uploadsDir);
     console.log("Created uploads directory:", uploadsDir);
 }
 
