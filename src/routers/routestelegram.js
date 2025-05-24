@@ -1,18 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const TelegramBot = require('node-telegram-bot-api');
+const NodeCache = require('node-cache'); // Thêm thư viện caching
 
 const token = process.env.TELEGRAM_BOT_TOKEN || '7789171652:AAEmz2GIO5WECWE2K1o-d6bve3vdvFctLCg';
 const bot = new TelegramBot(token);
 const BASE_API_URL = 'https://backendkqxs.onrender.com/api/kqxs';
 
+// Khởi tạo cache với thời gian sống (TTL) là 1 giờ
+const cache = new NodeCache({ stdTTL: 3600 });
+
 router.post('/', async (req, res) => {
     const update = req.body;
     try {
-        console.log('Nhận yêu cầu từ Telegram:', JSON.stringify(req.body, null, 2));
-        const { default: fetch } = await import('node-fetch');
         if (!update.message || !update.message.text) {
-            console.log('Không có message hoặc text trong yêu cầu');
             return res.status(200).send('OK');
         }
 
@@ -23,43 +24,41 @@ router.post('/', async (req, res) => {
 
         const sendLongMessage = async (chatId, text) => {
             const maxLength = 4096;
+            const messages = [];
             for (let i = 0; i < text.length; i += maxLength) {
-                await bot.sendMessage(chatId, text.slice(i, i + maxLength));
+                messages.push(text.slice(i, i + maxLength));
             }
+            await Promise.all(messages.map(msg => bot.sendMessage(chatId, msg)));
         };
 
         const callApi = async (endpoint, params = {}) => {
             const query = new URLSearchParams(params).toString();
             const url = `${BASE_API_URL}${endpoint}${query ? '?' + query : ''}`;
-            console.log('Gọi API:', url);
+            const cacheKey = url;
+
+            // Kiểm tra cache trước khi gọi API
+            const cachedData = cache.get(cacheKey);
+            if (cachedData) {
+                return cachedData;
+            }
+
             const response = await fetch(url, {
                 headers: { 'x-user-id': 'bot' },
                 method: 'GET',
+                timeout: 5000, // Thêm timeout để tránh chờ quá lâu
             });
+
             if (response.status !== 200) {
                 throw new Error(`Lỗi khi gọi API ${endpoint}: ${response.statusText}`);
             }
-            return await response.json();
-        };
 
-        // Hàm kiểm tra URL ảnh
-        const checkImageUrl = async (url) => {
-            try {
-                const response = await fetch(url, { method: 'HEAD' });
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.startsWith('image/')) {
-                    throw new Error(`URL ${url} không trả về định dạng ảnh hợp lệ: ${contentType}`);
-                }
-                return true;
-            } catch (error) {
-                console.error('Lỗi kiểm tra URL ảnh:', error.message);
-                return false;
-            }
+            const data = await response.json();
+            cache.set(cacheKey, data); // Lưu vào cache
+            return data;
         };
 
         switch (command) {
             case '/start':
-                // Gửi hình ảnh với welcomeMessage làm caption
                 const imageUrl = 'https://i.ibb.co/H29L7WL/460.jpg';
                 const welcomeMessage = `
 💎[TIN888 UY TÍN TẠO NIỀM TIN](https://tin888vn.online/)💎
@@ -91,54 +90,29 @@ router.post('/', async (req, res) => {
 `;
                 const inlineKeyboard = {
                     inline_keyboard: [
-                        [
-                            {
-                                text: 'CHƠI NGAY',
-                                url: 'https://tin888vn.online/'
-                            }
-                        ],
-                        [
-                            {
-                                text: 'LIÊN HỆ CSKH 24/7',
-                                url: 'https://t.me/CSKHTIN888/'
-                            },
-                        ],
-                        [
-                            {
-                                text: 'CỘNG ĐỒNG TIN888',
-                                url: 'https://t.me/trangchutin888/'
-                            },
-                        ]
+                        [{ text: 'CHƠI NGAY', url: 'https://tin888vn.online/' }],
+                        [{ text: 'LIÊN HỆ CSKH 24/7', url: 'https://t.me/CSKHTIN888/' }],
+                        [{ text: 'CỘNG ĐỒNG TIN888', url: 'https://t.me/trangchutin888/' }],
                     ]
                 };
 
-                // Kiểm tra URL ảnh trước khi gửi
-                const isValidImage = await checkImageUrl(imageUrl);
-                if (isValidImage) {
-                    try {
-                        await bot.sendPhoto(chatId, imageUrl, {
-                            caption: welcomeMessage.length > 1024 ? welcomeMessage.slice(0, 1024) : welcomeMessage,
-                            parse_mode: 'Markdown',
-                            reply_markup: inlineKeyboard
-                        });
-                        // Nếu welcomeMessage dài hơn 1024 ký tự, gửi phần còn lại
-                        if (welcomeMessage.length > 1024) {
-                            await sendLongMessage(chatId, welcomeMessage.slice(1024));
-                        }
-                    } catch (photoError) {
-                        console.error('Lỗi gửi ảnh:', photoError.message);
-                        await bot.sendMessage(chatId, 'Không thể gửi ảnh, nhưng bạn vẫn có thể khám phá TIN888!', {
-                            parse_mode: 'Markdown',
-                            reply_markup: inlineKeyboard
-                        });
-                        await sendLongMessage(chatId, welcomeMessage);
-                    }
-                } else {
-                    console.log('URL ảnh không hợp lệ, gửi welcomeMessage mà không có ảnh');
-                    await bot.sendMessage(chatId, welcomeMessage, {
+                try {
+                    // Bỏ kiểm tra URL ảnh để giảm độ trễ
+                    await bot.sendPhoto(chatId, imageUrl, {
+                        caption: welcomeMessage.length > 1024 ? welcomeMessage.slice(0, 1024) : welcomeMessage,
                         parse_mode: 'Markdown',
                         reply_markup: inlineKeyboard
                     });
+
+                    if (welcomeMessage.length > 1024) {
+                        await sendLongMessage(chatId, welcomeMessage.slice(1024));
+                    }
+                } catch (photoError) {
+                    await bot.sendMessage(chatId, 'Không thể gửi ảnh, nhưng bạn vẫn có thể khám phá TIN888!', {
+                        parse_mode: 'Markdown',
+                        reply_markup: inlineKeyboard
+                    });
+                    await sendLongMessage(chatId, welcomeMessage);
                 }
                 break;
 
