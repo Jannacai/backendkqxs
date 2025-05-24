@@ -11,6 +11,9 @@ const routes = require('./src/routers/index');
 const fs = require("fs");
 require('dotenv').config();
 
+// Import router xử lý webhook Telegram
+const telegramWebhookRouter = require('./src/routers/routestelegram'); // Đảm bảo đường dẫn đúng tới file router của bạn
+
 const app = express();
 const server = http.createServer(app);
 
@@ -27,7 +30,7 @@ if (!fs.existsSync(uploadsDir)) {
 app.use("/uploads", express.static(uploadsDir, {
     setHeaders: (res, filePath) => {
         console.log("Serving file:", filePath);
-        res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+        res.setHeader("Access-Control-Allow-Origin", "https://xsmb.win");
     },
 }));
 
@@ -53,7 +56,33 @@ mongoose.connect(process.env.MONGODB_URI, {
     .then(() => console.log('Connected to MongoDB'))
     .catch(err => console.error('MongoDB connection error:', err));
 
+// Gắn route xử lý webhook Telegram
+app.use('/webhook', telegramWebhookRouter);
 
+// Thiết lập webhook cho Telegram khi server khởi động
+const setTelegramWebhook = async () => {
+    const token = process.env.TELEGRAM_BOT_TOKEN || '7789171652:AAEmz2GIO5WECWE2K1o-d6bve3vdvFctLCg';
+    const WEBHOOK_URL = 'https://backendkqxs.onrender.com/webhook'; // URL của server + endpoint webhook
+
+    try {
+        const { default: fetch } = await import('node-fetch');
+        const url = `https://api.telegram.org/bot${token}/setWebhook?url=${WEBHOOK_URL}`;
+        const response = await fetch(url);
+        const result = await response.json();
+        if (result.ok) {
+            console.log('Webhook đã được thiết lập thành công:', WEBHOOK_URL);
+        } else {
+            console.error('Lỗi thiết lập webhook:', result);
+        }
+    } catch (error) {
+        console.error('Lỗi khi thiết lập webhook:', error.message);
+    }
+};
+
+// Gọi hàm thiết lập webhook khi server khởi động
+setTelegramWebhook();
+
+// Gắn các route khác
 routes(app);
 
 module.exports = app;
