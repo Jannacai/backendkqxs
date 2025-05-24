@@ -39,8 +39,8 @@ app.use(cors({
 app.use(compression());
 app.use(morgan('dev', { skip: (req, res) => res.statusCode < 400 })); // Chỉ log lỗi
 app.use(helmet());
-app.use(express.json({ limit: '10kb' })); // Giới hạn kích thước payload
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: '100kb' })); // Giới hạn kích thước payload
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
