@@ -4,7 +4,7 @@ const TelegramBot = require('node-telegram-bot-api');
 
 const token = process.env.TELEGRAM_BOT_TOKEN || '7789171652:AAEmz2GIO5WECWE2K1o-d6bve3vdvFctLCg';
 const bot = new TelegramBot(token);
-const BASE_API_URL = 'https://wr8q0kdx-5000.asse.devtunnels.ms/api/kqxs';
+const BASE_API_URL = 'https://backendkqxs.onrender.com/api/kqxs';
 
 router.post('/', async (req, res) => {
     const update = req.body;
