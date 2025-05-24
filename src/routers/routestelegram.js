@@ -50,7 +50,7 @@ router.post('/', async (req, res) => {
         }
         cache.set(messageKey, true, 300);
 
-        const send，长Message = async (chatId, text) => {
+        const sendLongMessage = async (chatId, text) => {
             const maxLength = 4096;
             const messages = [];
             for (let i = 0; i < text.length; i += maxLength) {
@@ -74,12 +74,12 @@ router.post('/', async (req, res) => {
             const response = await fetch(url, {
                 headers: { 'x-user-id': 'bot' },
                 method: 'GET',
-                signal: AbortSignal.timeout(5000),
+                signal: AbortSignal.timeout(10000), // Tăng timeout lên 10 giây
             });
 
             if (response.status !== 200) {
                 console.error(`Lỗi API ${url}: ${response.statusText}`);
-                throw new Error(`Lỗi khi gọi API ${endpoint}: ${response.statusText}`);
+                throw new Error(`Lỗi khi gọi API ${endpoint}: ${response.statusText} (${response.status})`);
             }
 
             const data = await response.json();
