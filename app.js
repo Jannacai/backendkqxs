@@ -33,7 +33,7 @@ app.use('/uploads', express.static(uploadsDir, {
 
 // Khởi tạo middleware
 app.use(cors({
-    origin: 'http://localhost:3000', // Giới hạn origin để tăng bảo mật
+    origin: 'https://xsmb.win', // Giới hạn origin để tăng bảo mật
     methods: ['GET', 'POST'], // Chỉ cho phép các phương thức cần thiết
 }));
 app.use(compression());
