@@ -1,89 +1,113 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://backendkqxs.onrender.com";
+const express = require("express");
+const router = express.Router();
+const jwt = require("jsonwebtoken");
+const Post = require("../../models/posts.models");
+const multer = require("multer");
+const fs = require("fs").promises;
+const path = require("path");
 
-export const getPosts = async (page = 1, limit = 10) => {
-    const url = `${API_BASE_URL}/api/posts?page=${page}&limit=${limit}`;
-    console.log("Fetching posts from:", url);
+const authenticate = (req, res, next) => {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
     try {
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                "Cache-Control": "no-cache",
-            },
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.log("Error response from server:", errorText);
-            throw new Error(`Có lỗi khi lấy danh sách bài viết: ${response.status} - ${errorText}`);
-        }
-
-        const result = await response.json();
-        console.log("Posts data:", result);
-        return result;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
     } catch (error) {
-        console.error("Error in getPosts:", error);
-        throw error;
+        console.error("Token verification error:", error.message);
+        return res.status(401).json({ error: "Invalid token" });
     }
 };
 
-export const createPost = async (postData) => {
-    const session = await getSession();
-    const url = `${API_BASE_URL}/api/posts`;
-    console.log("Creating post at:", url);
-    try {
-        const formData = new FormData();
-        formData.append("title", postData.title);
-        formData.append("description", postData.description);
-        if (postData.img) {
-            formData.append("img", postData.img);
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, "uploads/");
+    },
+    filename: (req, file, cb) => {
+        const filename = Date.now() + path.extname(file.originalname);
+        cb(null, filename);
+    },
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const filetypes = /jpeg|png|jpg|svg|webp/;
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = filetypes.test(file.mimetype);
+        if (extname && mimetype) {
+            return cb(null, true);
         }
+        cb(new Error("Chỉ chấp nhận file JPEG hoặc PNG"));
+    },
+}).single("img");
 
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${session?.accessToken}`,
-                "Cache-Control": "no-cache",
-            },
-            body: formData,
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.log("Error response from server:", errorText);
-            throw new Error(`Có lỗi khi đăng bài: ${response.status} - ${errorText}`);
+const handleMulterError = (req, res, next) => {
+    upload(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            return res.status(400).json({ error: err.message });
+        } else if (err) {
+            return res.status(400).json({ error: err.message });
         }
-
-        const result = await response.json();
-        console.log("Post created:", result);
-        return result;
-    } catch (error) {
-        console.error("Error in createPost:", error);
-        throw error;
-    }
+        next();
+    });
 };
 
-export const getPostById = async (id) => {
-    const url = `${API_BASE_URL}/api/posts/${id}`;
-    console.log("Fetching post with ID:", id);
-    try {
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                "Cache-Control": "no-cache",
-            },
-        });
+router.post("/", authenticate, handleMulterError, async (req, res) => {
+    const { title, description } = req.body;
+    let imgBase64 = undefined;
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.log("Error response from server:", errorText);
-            throw new Error(`Có lỗi khi lấy bài viết: ${response.status} - ${errorText}`);
-        }
-
-        const result = await response.json();
-        console.log("Post data:", result);
-        return result;
-    } catch (error) {
-        console.error("Error in getPostById:", error);
-        throw error;
+    if (req.file) {
+        const fileBuffer = await fs.readFile(req.file.path);
+        imgBase64 = `data:${req.file.mimetype};base64,${fileBuffer.toString("base64")}`;
+        await fs.unlink(req.file.path);
     }
-};
+
+    if (!title || !description) {
+        return res.status(400).json({ error: "Title and description are required" });
+    }
+
+    try {
+        const post = new Post({
+            title,
+            description,
+            img: imgBase64,
+            author: req.user.userId,
+        });
+        await post.save();
+        res.status(201).json(post);
+    } catch (error) {
+        console.error("Error saving post:", error.message);
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
+    }
+});
+
+router.get("/", async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        const posts = await Post.find().skip(skip).limit(limit).sort({ createdAt: -1 });
+        const total = await Post.countDocuments();
+        res.status(200).json({ posts, total, page, limit });
+    } catch (error) {
+        console.error("Error fetching posts:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+router.get("/:id", async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post) {
+            return res.status(404).json({ error: "Post not found" });
+        }
+        res.status(200).json(post);
+    } catch (error) {
+        console.error("Error fetching post:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+module.exports = router;
