@@ -12,7 +12,6 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN'; // Dùng biến môi trường hoặc hardcode tạm
 const bot = new TelegramBot(token);
 
-
 // Kết nối Redis
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -32,7 +31,7 @@ const parseDate = (dateStr) => {
 };
 
 // Tính toán trước dữ liệu thống kê (chạy lúc 18:30 mỗi ngày)
-cron.schedule('30 18 * * *', async () => {
+cron.schedule('40 18 * * *', async () => {
     console.log('Tính toán trước thống kê lô gan...');
     const daysOptions = [6, 7, 14, 30, 60];
     for (const days of daysOptions) {
@@ -261,7 +260,6 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
         }
 
         const subscriber = redis.createClient({ url: process.env.REDIS_URL });
-        await subscriber.connect();
         await subscriber.subscribe(`xsmb:${targetDate}`, async (message) => {
             console.log('Nhận Redis message:', message);
             try {
@@ -442,21 +440,47 @@ router.get('/', apiLimiter, async (req, res) => {
 router.get('/xsmb', apiLimiter, async (req, res) => {
     try {
         const { date, limit = 30 } = req.query;
-        const query = { station: 'xsmb' };
-        if (date && /^\d{2}-\d{2}-\d{4}$/.test(date)) {
-            query.drawDate = parseDate(date);
+
+        // Kiểm tra và parse limit
+        const parsedLimit = parseInt(limit);
+        if (isNaN(parsedLimit) || parsedLimit <= 0) {
+            return res.status(400).json({ error: 'Giới hạn (limit) phải là số dương.' });
         }
 
+        // Tạo query cơ bản
+        const query = { station: 'xsmb' };
+
+        // Kiểm tra và parse date
+        let cacheKey = `kqxs:xsmb:all:${parsedLimit}`;
+        if (date) {
+            if (!/^\d{2}-\d{2}-\d{4}$/.test(date)) {
+                return res.status(400).json({ error: 'Định dạng ngày không hợp lệ. Vui lòng dùng DD-MM-YYYY.' });
+            }
+            try {
+                query.drawDate = parseDate(date);
+                cacheKey = `kqxs:xsmb:${date}:${parsedLimit}`;
+            } catch (error) {
+                return res.status(400).json({ error: error.message });
+            }
+        }
+
+        // Kiểm tra cache Redis trước
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        // Query MongoDB nếu không có cache
         const results = await XSMB.find(query)
             .lean()
             .sort({ drawDate: -1 })
-            .limit(parseInt(limit));
+            .limit(parsedLimit);
 
         if (!results.length) {
             return res.status(404).json({ error: `Không tìm thấy dữ liệu cho xsmb, date: ${date || 'all'}` });
         }
 
-        const cacheKey = `kqxs:xsmb:${date || 'all'}:${limit}`;
+        // Lưu cache và trả kết quả
         await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
         res.status(200).json(results);
     } catch (error) {
@@ -602,7 +626,7 @@ router.post('/telegram', async (req, res) => {
             await bot.sendMessage(chatId, 'Chào bạn! Gõ /xsmb để xem kết quả xổ số miền Bắc.');
         } else if (text === '/xsmb') {
             // Gọi API /xsmb
-            const response = await fetch('http://localhost:3000/xsmb', {
+            const response = await fetch('https://backendkqxs.onrender.com/xsmb', {
                 headers: { 'x-user-id': 'bot' }, // Thêm header để qua rate limiter
             });
             const data = await response.json();
@@ -625,6 +649,24 @@ router.post('/telegram', async (req, res) => {
     } catch (error) {
         console.error('Lỗi xử lý webhook Telegram:', error.message);
         return res.status(500).end();
+    }
+});
+// Trong file route (ví dụ: routes/xsmb.js)
+router.get('/cache', async (req, res) => {
+    const { key } = req.query;
+    if (!key) return res.status(400).json({ error: 'Key is required' });
+
+    try {
+        const cached = await redisClient.get(key);
+        if (cached) {
+            const data = JSON.parse(cached);
+            res.json({ exists: true, value: data, timestamp: new Date().toISOString() });
+        } else {
+            res.json({ exists: false, value: null });
+        }
+    } catch (error) {
+        console.error('Lỗi khi kiểm tra cache:', error);
+        res.status(500).json({ error: 'Lỗi server' });
     }
 });
 module.exports = router;
