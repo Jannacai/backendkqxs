@@ -116,7 +116,6 @@ router.get("/", async (req, res) => {
         res.status(200).json(posts);
         console.log("Posts retrieved:", posts);
     } catch (error) {
-        console.error("Error fetching posts:", error.message); // Log lỗi chi tiết
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
