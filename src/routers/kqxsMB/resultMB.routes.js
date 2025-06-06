@@ -32,7 +32,7 @@ const parseDate = (dateStr) => {
 };
 
 // Tính toán trước dữ liệu thống kê (chạy lúc 18:30 mỗi ngày)
-cron.schedule('30 18 * * *', async () => {
+cron.schedule('40 18 * * *', async () => {
     console.log('Tính toán trước thống kê lô gan...');
     const daysOptions = [6, 7, 14, 30, 60];
     for (const days of daysOptions) {

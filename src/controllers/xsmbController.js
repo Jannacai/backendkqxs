@@ -225,7 +225,7 @@ const getSpecialPrizeStatsByWeek = async (req, res) => {
 
         const result = await calculateSpecialPrizeStatsByWeek(month, year, station, tinh);
         try {
-            await redisClient.setEx(cacheKey, 1800, JSON.stringify(result));
+            await redisClient.setEx(cacheKey, 7200, JSON.stringify(result));
             console.log(`Đã cache dữ liệu: ${cacheKey}`);
         } catch (redisErr) {
             console.warn('Lỗi khi lưu vào Redis:', redisErr.message);
@@ -795,7 +795,7 @@ const getLoGanStats = async (req, res) => {
 
         const result = await calculateLoGan(days, station, tinh);
         try {
-            await redisClient.setEx(cacheKey, 1800, JSON.stringify(result));
+            await redisClient.setEx(cacheKey, 7200, JSON.stringify(result));
             console.log(`Đã cache dữ liệu: ${cacheKey}`);
         } catch (redisErr) {
             console.warn('Lỗi khi lưu vào Redis:', redisErr.message);
@@ -842,7 +842,7 @@ const getSpecialPrizeStats = async (req, res) => {
 
         const result = await calculateSpecialPrizeStats(days, station, tinh);
         try {
-            await redisClient.setEx(cacheKey, 1800, JSON.stringify(result));
+            await redisClient.setEx(cacheKey, 7200, JSON.stringify(result));
             console.log(`Đã cache dữ liệu: ${cacheKey}`);
         } catch (redisErr) {
             console.warn('Lỗi khi lưu vào Redis:', redisErr.message);
@@ -886,7 +886,7 @@ const getDauDuoiStats = async (req, res) => {
 
         const result = await calculateDauDuoiStats(days, tinh);
         try {
-            await redisClient.setEx(cacheKey, 1800, JSON.stringify(result));
+            await redisClient.setEx(cacheKey, 7200, JSON.stringify(result));
             console.log(`Đã cache dữ liệu: ${cacheKey}`);
         } catch (redisErr) {
             console.warn('Lỗi khi lưu vào Redis:', redisErr.message);
@@ -930,7 +930,7 @@ const getDauDuoiStatsByDate = async (req, res) => {
 
         const result = await calculateDauDuoiStatsByDate(days, tinh);
         try {
-            await redisClient.setEx(cacheKey, 1800, JSON.stringify(result));
+            await redisClient.setEx(cacheKey, 7200, JSON.stringify(result));
             console.log(`Đã cache dữ liệu: ${cacheKey}`);
         } catch (redisErr) {
             console.warn('Lỗi khi lưu vào Redis:', redisErr.message);
@@ -1099,7 +1099,7 @@ const getTanSuatLotoStats = async (req, res) => {
 
         const result = await calculateTanSuatLoto(days, station, tinh);
         try {
-            await redisClient.setEx(cacheKey, 1800, JSON.stringify(result));
+            await redisClient.setEx(cacheKey, 7200, JSON.stringify(result));
             console.log(`Đã cache dữ liệu: ${cacheKey}`);
         } catch (redisErr) {
             console.warn('Lỗi khi lưu vào Redis:', redisErr.message);
@@ -1326,7 +1326,7 @@ const getTanSuatLoCapStats = async (req, res) => {
 
         const result = await calculateTanSuatLoCap(days, station, tinh);
         try {
-            await redisClient.setEx(cacheKey, 1800, JSON.stringify(result));
+            await redisClient.setEx(cacheKey, 7200, JSON.stringify(result));
             console.log(`Đã cache dữ liệu: ${cacheKey}`);
         } catch (redisErr) {
             console.warn('Lỗi khi lưu vào Redis:', redisErr.message);

@@ -16,7 +16,7 @@ redisClient.connect().catch(err => console.error('Lỗi kết nối Redis:', err
 const subscribers = new Map(); // channel -> { subscriber, clients: Set }
 
 // Tính toán trước dữ liệu thống kê (chạy lúc 0h mỗi ngày)
-cron.schedule('0 0 * * *', async () => {
+cron.schedule('40 16 * * *', async () => {
     console.log('Tính toán trước thống kê lô gan XSMN...');
     const daysOptions = [6, 7, 14, 30, 60];
     const provinces = ['vung-tau', 'can-tho', 'dong-thap', 'tphcm', 'ca-mau', 'ben-tre', 'bac-lieu', 'soc-trang', 'dong-nai', 'an-giang', 'tay-ninh', 'binh-thuan', 'vinh-long', 'tra-vinh', 'long-an', 'binh-phuoc', 'hau-giang', 'kien-giang', 'tien-giang', 'da-lat'];
