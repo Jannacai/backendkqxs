@@ -4,7 +4,9 @@ const postSchema = new mongoose.Schema({
     title: { type: String, required: true },
     description: { type: String, required: true },
     img: { type: String },
-    img2: { type: String }, // Thêm trường cho hình ảnh thứ hai
+    caption: { type: String }, // Thêm trường cho chú thích hình ảnh 1
+    img2: { type: String },
+    caption2: { type: String }, // Thêm trường cho chú thích hình ảnh 2
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
     category: {
