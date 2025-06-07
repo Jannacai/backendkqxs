@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
 const Post = require("../../models/posts.models");
-const User = require("../../models/users.models");
 const redis = require("redis");
 const rateLimit = require("express-rate-limit");
 const fetch = require("node-fetch");
@@ -14,8 +13,9 @@ redisClient.connect().catch((err) => console.error("Lỗi kết nối Redis:", e
 
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 100,
+    max: 200,
     message: "Quá nhiều yêu cầu, vui lòng thử lại sau.",
+    headers: true,
 });
 
 const authenticate = (req, res, next) => {
@@ -120,13 +120,23 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         });
         await post.save();
 
-        const keys = await redisClient.keys("posts:recent:*");
-        if (keys.length > 0) {
-            await redisClient.del(keys);
-            console.log("Cleared cache keys:", keys);
+        // Cập nhật danh sách 15 bài trong cache
+        const cacheKey = `posts:recent:page:1:limit:15:category:${category || 'all'}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            let cachedData = JSON.parse(cached);
+            cachedData.posts = [post, ...cachedData.posts.filter(p => p._id !== post._id).slice(0, 14)];
+            await redisClient.setEx(cacheKey, 120, JSON.stringify(cachedData));
+        }
+
+        // Xóa cache liên quan
+        const cachedKeys = await redisClient.sMembers("cachedPostKeys");
+        if (cachedKeys.length > 0) {
+            await redisClient.del(cachedKeys);
+            await redisClient.del("cachedPostKeys");
+            console.log("Cleared cache keys:", cachedKeys);
         }
         await redisClient.del(`post:${post._id}`);
-        console.log("Cleared cache for post:", post._id);
 
         res.status(201).json(post);
     } catch (error) {
@@ -141,11 +151,11 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
 router.get("/", apiLimiter, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
+        const limit = Math.min(parseInt(req.query.limit) || 15, 15);
         const skip = (page - 1) * limit;
+        const category = req.query.category || null;
 
-        const cacheKey = `posts:recent:page:${page}:limit:${limit}`;
-        console.log("Cache key:", cacheKey);
+        const cacheKey = `posts:recent:page:${page}:limit:${limit}:category:${category || 'all'}`;
         const cached = await redisClient.get(cacheKey);
 
         if (cached) {
@@ -155,22 +165,32 @@ router.get("/", apiLimiter, async (req, res) => {
 
         const now = new Date();
         const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-        console.log("twoDaysAgo:", twoDaysAgo.toISOString(), "Now:", new Date().toISOString());
-        const posts = await Post.find({ createdAt: { $gte: twoDaysAgo } })
+        let query = { createdAt: { $gte: twoDaysAgo } };
+        if (category) {
+            query.category = category;
+        }
+
+        const posts = await Post.find(query)
             .select("title description img img2 caption caption2 createdAt category")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean();
 
-        const totalPosts = await Post.countDocuments({ createdAt: { $gte: twoDaysAgo } });
+        // Loại bỏ bài viết trùng _id
+        const seenIds = new Set();
+        const uniquePosts = posts.filter(post => !seenIds.has(post._id) && seenIds.add(post._id));
+
+        const totalPosts = await Post.countDocuments(query);
         const response = {
-            posts,
+            posts: uniquePosts,
             totalPages: Math.ceil(totalPosts / limit),
             currentPage: page,
+            hasMore: uniquePosts.length === limit && skip + limit < totalPosts,
         };
 
-        await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
+        await redisClient.setEx(cacheKey, 120, JSON.stringify(response));
+        await redisClient.sAdd("cachedPostKeys", cacheKey);
         res.set('Cache-Control', 'no-store');
         res.status(200).json(response);
     } catch (error) {
@@ -197,6 +217,7 @@ router.get("/:id", apiLimiter, async (req, res) => {
         }
 
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(post));
+        await redisClient.sAdd("cachedPostKeys", cacheKey);
         res.set('Cache-Control', 'no-store');
         res.status(200).json(post);
     } catch (error) {
