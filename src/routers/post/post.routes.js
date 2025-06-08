@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const Post = require("../../models/posts.models");
+const Post = require("../../models/posts.models"); // Sửa đường dẫn nếu cần
 const redis = require("redis");
 const rateLimit = require("express-rate-limit");
 const fetch = require("node-fetch");
@@ -120,16 +120,14 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         });
         await post.save();
 
-        // Cập nhật danh sách 15 bài trong cache
         const cacheKey = `posts:recent:page:1:limit:15:category:${category || 'all'}`;
         const cached = await redisClient.get(cacheKey);
         if (cached) {
             let cachedData = JSON.parse(cached);
             cachedData.posts = [post, ...cachedData.posts.filter(p => p._id !== post._id).slice(0, 14)];
-            await redisClient.setEx(cacheKey, 120, JSON.stringify(cachedData));
+            await redisClient.setEx(cacheKey, 300, JSON.stringify(cachedData));
         }
 
-        // Xóa cache liên quan
         const cachedKeys = await redisClient.sMembers("cachedPostKeys");
         if (cachedKeys.length > 0) {
             await redisClient.del(cachedKeys);
@@ -144,7 +142,7 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         if (error.name === "ValidationError") {
             return res.status(400).json({ error: "Invalid data", details: error.errors });
         }
-        res.status(500).json({ error: "Failed to save post", details: error.message });
+        return res.status(500).json({ error: "Failed to save post", details: error.message });
     }
 });
 
@@ -171,13 +169,12 @@ router.get("/", apiLimiter, async (req, res) => {
         }
 
         const posts = await Post.find(query)
-            .select("title description img img2 caption caption2 createdAt category")
+            .select("title description img img2 caption caption2 createdAt category slug")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean();
 
-        // Loại bỏ bài viết trùng _id
         const seenIds = new Set();
         const uniquePosts = posts.filter(post => !seenIds.has(post._id) && seenIds.add(post._id));
 
@@ -189,7 +186,7 @@ router.get("/", apiLimiter, async (req, res) => {
             hasMore: uniquePosts.length === limit && skip + limit < totalPosts,
         };
 
-        await redisClient.setEx(cacheKey, 120, JSON.stringify(response));
+        await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
         await redisClient.sAdd("cachedPostKeys", cacheKey);
         res.set('Cache-Control', 'no-store');
         res.status(200).json(response);
@@ -199,9 +196,10 @@ router.get("/", apiLimiter, async (req, res) => {
     }
 });
 
-router.get("/:id", apiLimiter, async (req, res) => {
+router.get("/:identifier", apiLimiter, async (req, res) => {
     try {
-        const cacheKey = `post:${req.params.id}`;
+        const { identifier } = req.params;
+        const cacheKey = `post:${identifier}`;
         const cached = await redisClient.get(cacheKey);
 
         if (cached) {
@@ -209,19 +207,70 @@ router.get("/:id", apiLimiter, async (req, res) => {
             return res.status(200).json(JSON.parse(cached));
         }
 
-        const post = await Post.findById(req.params.id)
-            .select("title description img img2 caption caption2 createdAt category")
+        const isMongoId = /^[0-9a-fA-F]{24}$/.test(identifier);
+        const query = isMongoId ? { _id: identifier } : { slug: identifier };
+
+        const post = await Post.findOne(query)
+            .select("title description img img2 caption caption2 createdAt category slug")
             .lean();
         if (!post) {
             return res.status(404).json({ error: "Post not found" });
         }
 
-        await redisClient.setEx(cacheKey, 3600, JSON.stringify(post));
+        await redisClient.setEx(cacheKey, 7200, JSON.stringify(post));
         await redisClient.sAdd("cachedPostKeys", cacheKey);
         res.set('Cache-Control', 'no-store');
         res.status(200).json(post);
     } catch (error) {
         console.error("Error fetching post:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+router.get("/combined/:identifier", apiLimiter, async (req, res) => {
+    try {
+        const { identifier } = req.params;
+        const cacheKey = `combined:${identifier}`;
+        const cached = await redisClient.get(cacheKey);
+
+        if (cached) {
+            res.set('Cache-Control', 'no-store');
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        const isMongoId = /^[0-9a-fA-F]{24}$/.test(identifier);
+        const query = isMongoId ? { _id: identifier } : { slug: identifier };
+
+        const post = await Post.findOne(query)
+            .select("title description img img2 caption caption2 createdAt category slug")
+            .lean();
+        if (!post) {
+            return res.status(404).json({ error: "Post not found" });
+        }
+
+        const related = await Post.find({
+            category: post.category,
+            _id: { $ne: post._id }
+        })
+            .select("title description img img2 caption caption2 createdAt category slug")
+            .limit(4)
+            .lean();
+
+        const football = await Post.find({
+            category: "Thể thao",
+            _id: { $ne: post._id }
+        })
+            .select("title description img img2 caption caption2 createdAt category slug")
+            .limit(3)
+            .lean();
+
+        const response = { post, related, football };
+        await redisClient.setEx(cacheKey, 7200, JSON.stringify(response));
+        await redisClient.sAdd("cachedPostKeys", cacheKey);
+        res.set('Cache-Control', 'no-store');
+        res.status(200).json(response);
+    } catch (error) {
+        console.error("Error fetching combined post data:", error.message);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
