@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const Post = require("../../models/posts.models"); // Sửa đường dẫn nếu cần
+const Post = require("../../models/posts.models");
 const redis = require("redis");
 const rateLimit = require("express-rate-limit");
 const fetch = require("node-fetch");
@@ -124,7 +124,7 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         const cached = await redisClient.get(cacheKey);
         if (cached) {
             let cachedData = JSON.parse(cached);
-            cachedData.posts = [post, ...cachedData.posts.filter(p => p._id !== post._id).slice(0, 14)];
+            cachedData.posts = [post.toJSON(), ...cachedData.posts.filter(p => p._id.toString() !== post._id.toString()).slice(0, 14)];
             await redisClient.setEx(cacheKey, 300, JSON.stringify(cachedData));
         }
 
@@ -178,7 +178,8 @@ router.get("/", apiLimiter, async (req, res) => {
         const seenIds = new Set();
         const uniquePosts = posts.filter(post => !seenIds.has(post._id) && seenIds.add(post._id));
 
-        const totalPosts = await Post.countDocuments(query);
+        const totalPosts = await Post.countDocuments(query); // Thêm dòng này
+
         const response = {
             posts: uniquePosts,
             totalPages: Math.ceil(totalPosts / limit),
@@ -253,7 +254,8 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
             _id: { $ne: post._id }
         })
             .select("title description img img2 caption caption2 createdAt category slug")
-            .limit(4)
+            .sort({ createdAt: -1 })
+            .limit(15)
             .lean();
 
         const football = await Post.find({
@@ -261,7 +263,8 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
             _id: { $ne: post._id }
         })
             .select("title description img img2 caption caption2 createdAt category slug")
-            .limit(3)
+            .sort({ createdAt: -1 })
+            .limit(15)
             .lean();
 
         const response = { post, related, football };
