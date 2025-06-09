@@ -149,7 +149,15 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         return res.status(500).json({ error: "Failed to save post", details: error.message });
     }
 });
-
+// Thêm endpoint để lấy danh sách danh mục
+router.get("/categories", apiLimiter, async (req, res) => {
+    try {
+        res.status(200).json({ categories: VALID_CATEGORIES });
+    } catch (error) {
+        console.error("Error fetching categories:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 router.get("/", apiLimiter, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -282,14 +290,6 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
     }
 });
 
-// Thêm endpoint để lấy danh sách danh mục
-router.get("/categories", apiLimiter, async (req, res) => {
-    try {
-        res.status(200).json({ categories: VALID_CATEGORIES });
-    } catch (error) {
-        console.error("Error fetching categories:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
+
 
 module.exports = router;
