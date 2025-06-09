@@ -5,7 +5,24 @@ const Post = require("../../models/posts.models");
 const { VALID_CATEGORIES } = require("../../models/posts.models");
 const redis = require("redis");
 const rateLimit = require("express-rate-limit");
-const fetch = require("node-fetch");
+const { google } = require('googleapis');
+const stream = require('stream');
+const multer = require('multer');
+
+// Cấu hình Multer để xử lý file upload
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // Giới hạn 5MB
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only images (jpg, jpeg, png, gif, webp) are allowed'), false);
+        }
+    },
+});
 
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL || "redis://localhost:6379",
@@ -41,62 +58,56 @@ const restrictToAdmin = (req, res, next) => {
     next();
 };
 
-const isValidImageUrl = async (url) => {
-    if (!url || !url.startsWith("http")) {
-        return { valid: false, error: "URL phải bắt đầu bằng http hoặc https" };
-    }
-
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-    const hasImageExtension = imageExtensions.some(ext => url.toLowerCase().includes(ext));
-
-    if (!hasImageExtension) {
-        return { valid: false, error: "URL không chứa phần mở rộng hình ảnh hợp lệ (jpg, jpeg, png, gif, webp)" };
-    }
-
+// Endpoint để tải file lên Google Drive
+router.post('/upload-to-drive', authenticate, restrictToAdmin, upload.single('file'), async (req, res) => {
     try {
-        let response = await fetch(url, {
-            method: "HEAD",
-            headers: { "User-Agent": "Mozilla/5.0" },
-            timeout: 5000
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const credentialsRaw = process.env.GOOGLE_CREDENTIALS_JSON;
+        console.log('Raw GOOGLE_CREDENTIALS_JSON:', credentialsRaw.substring(0, 200) + '...'); // Log 200 ký tự đầu
+
+        const credentials = JSON.parse(credentialsRaw);
+        console.log('Parsed credentials:', credentials);
+
+        const auth = new google.auth.GoogleAuth({
+            credentials: credentials,
+            scopes: ['https://www.googleapis.com/auth/drive.file'],
         });
-        let contentType = response.headers.get("content-type");
+        const drive = google.drive({ version: 'v3', auth });
 
-        if (!response.ok || !contentType) {
-            response = await fetch(url, {
-                method: "GET",
-                headers: { "User-Agent": "Mozilla/5.0" },
-                timeout: 5000
-            });
-            contentType = response.headers.get("content-type");
-        }
+        const fileMetadata = {
+            name: `${Date.now()}_${req.file.originalname}`,
+            parents: ['1_vIBh_U62kLvPbvq7lKEwlv_VpRtxbQt'],
+        };
+        const media = {
+            mimeType: req.file.mimetype,
+            body: stream.PassThrough().end(req.file.buffer),
+        };
 
-        console.log(`Content-Type for URL ${url}: ${contentType}`);
+        const response = await drive.files.create({
+            resource: fileMetadata,
+            media,
+            fields: 'id',
+        });
 
-        const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-        if (!response.ok) {
-            console.warn(`Không thể truy cập URL: ${response.statusText}`);
-            return { valid: true };
-        }
+        await drive.permissions.create({
+            fileId: response.data.id,
+            requestBody: {
+                role: 'reader',
+                type: 'anyone',
+            },
+        });
 
-        if (contentType && validImageTypes.includes(contentType.toLowerCase())) {
-            return { valid: true };
-        }
+        const publicUrl = `https://drive.google.com/thumbnail?id=${response.data.id}&sz=w1000`;
 
-        if (hasImageExtension) {
-            console.warn(`Content-Type không chuẩn (${contentType}), nhưng chấp nhận do có phần mở rộng hợp lệ`);
-            return { valid: true };
-        }
-
-        return { valid: false, error: `URL không phải hình ảnh hợp lệ: Content-Type ${contentType}` };
+        res.status(200).json({ url: publicUrl });
     } catch (error) {
-        console.error(`Lỗi khi kiểm tra URL ${url}: ${error.message}`);
-        if (hasImageExtension) {
-            console.warn(`Fetch thất bại nhưng chấp nhận do có phần mở rộng hợp lệ`);
-            return { valid: true };
-        }
-        return { valid: false, error: `Lỗi khi kiểm tra URL: ${error.message}` };
+        console.error('Error uploading to Google Drive:', error);
+        res.status(500).json({ error: 'Failed to upload to Google Drive', details: error.stack });
     }
-};
+});
 
 router.post("/", authenticate, restrictToAdmin, async (req, res) => {
     const { title, mainContents, category, contentOrder } = req.body;
@@ -110,20 +121,18 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
             return res.status(400).json({ error: "mainContents must be an array" });
         }
         for (const content of mainContents) {
-            if (content.h2 && (content.h2.length < 5 || content.h2.length > 100)) {
-                return res.status(400).json({ error: "h2 must be between 5 and 100 characters" });
+            if (content.h2 && (content.h2.length < 5 || content.h2.length > 200)) {
+                return res.status(400).json({ error: "h2 must be between 5 and 200 characters" });
             }
             if (content.description && content.description.length < 20) {
                 return res.status(400).json({ error: "description must be at least 20 characters" });
             }
-            if (content.caption && content.caption.length > 100) {
-                return res.status(400).json({ error: "caption must be at most 100 characters" });
+            if (content.caption && content.caption.length > 200) {
+                return res.status(400).json({ error: "caption must be at most 200 characters" });
             }
-            if (content.img) {
-                const imgValidation = await isValidImageUrl(content.img);
-                if (!imgValidation.valid) {
-                    return res.status(400).json({ error: `Invalid image URL in mainContent: ${imgValidation.error}` });
-                }
+            // Bỏ kiểm tra bắt buộc URL từ Google Drive
+            if (content.img && !/^(https?:\/\/)/.test(content.img)) {
+                return res.status(400).json({ error: "Image URL must be a valid URL" });
             }
         }
     }
@@ -145,7 +154,7 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
             title,
             mainContents: mainContents || [],
             author: req.user.userId,
-            category: category || ["Thể thao"],
+            category: category || ["Tin hot"],
             contentOrder: contentOrder || [],
         });
         await post.save();
@@ -178,6 +187,7 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
     }
 });
 
+// Các endpoint khác giữ nguyên
 router.get("/categories", apiLimiter, async (req, res) => {
     try {
         res.status(200).json({ categories: VALID_CATEGORIES });

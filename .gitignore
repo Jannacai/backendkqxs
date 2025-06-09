@@ -1,6 +1,28 @@
+# Dependencies
 node_modules/
+
+# Environment variables
 .env
+
+# Uploads (nếu có thư mục lưu file tạm thời)
 uploads/
+
+# File JavaScript riêng lẻ (có thể là script tạm thời hoặc không cần commit)
 mienbac.js
 miennam.js
 mientrung.js
+
+# File khóa Service Account
+/server/xsmbwin-3eda45337a28.json
+server/credentials/
+
+# Log files (nếu có)
+*.log
+
+# Build output (nếu có)
+dist/
+build/
+
+# IDE và hệ điều hành file tạm
+*.swp
+.DS_Store
