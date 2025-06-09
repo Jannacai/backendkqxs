@@ -49,57 +49,82 @@ const isValidImageUrl = async (url) => {
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
     const hasImageExtension = imageExtensions.some(ext => url.toLowerCase().includes(ext));
 
+    if (!hasImageExtension) {
+        return { valid: false, error: "URL không chứa phần mở rộng hình ảnh hợp lệ (jpg, jpeg, png, gif, webp)" };
+    }
+
     try {
-        let response = await fetch(url, { method: "HEAD" });
+        let response = await fetch(url, {
+            method: "HEAD",
+            headers: { "User-Agent": "Mozilla/5.0" },
+            timeout: 5000
+        });
         let contentType = response.headers.get("content-type");
 
         if (!response.ok || !contentType) {
-            response = await fetch(url, { method: "GET" });
+            response = await fetch(url, {
+                method: "GET",
+                headers: { "User-Agent": "Mozilla/5.0" },
+                timeout: 5000
+            });
             contentType = response.headers.get("content-type");
         }
 
+        console.log(`Content-Type for URL ${url}: ${contentType}`);
+
         const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
         if (!response.ok) {
-            return { valid: false, error: `Không thể truy cập URL: ${response.statusText}` };
+            console.warn(`Không thể truy cập URL: ${response.statusText}`);
+            return { valid: true };
         }
 
         if (contentType && validImageTypes.includes(contentType.toLowerCase())) {
             return { valid: true };
         }
 
-        if (contentType && (contentType.includes("application/octet-stream") || !contentType.includes("image/"))) {
-            if (hasImageExtension) {
-                return { valid: true };
-            } else {
-                return { valid: false, error: "URL có Content-Type không rõ ràng, không phải hình ảnh hợp lệ" };
-            }
+        if (hasImageExtension) {
+            console.warn(`Content-Type không chuẩn (${contentType}), nhưng chấp nhận do có phần mở rộng hợp lệ`);
+            return { valid: true };
         }
 
-        return { valid: false, error: "URL không phải là hình ảnh hợp lệ (jpg, png, gif, webp)" };
+        return { valid: false, error: `URL không phải hình ảnh hợp lệ: Content-Type ${contentType}` };
     } catch (error) {
-        console.error("Error checking image URL:", error.message);
+        console.error(`Lỗi khi kiểm tra URL ${url}: ${error.message}`);
+        if (hasImageExtension) {
+            console.warn(`Fetch thất bại nhưng chấp nhận do có phần mở rộng hợp lệ`);
+            return { valid: true };
+        }
         return { valid: false, error: `Lỗi khi kiểm tra URL: ${error.message}` };
     }
 };
 
 router.post("/", authenticate, restrictToAdmin, async (req, res) => {
-    const { title, description, img, img2, caption, caption2, category } = req.body;
+    const { title, mainContents, category, contentOrder } = req.body;
 
-    if (!title || !description) {
-        return res.status(400).json({ error: "Title and description are required" });
+    if (!title) {
+        return res.status(400).json({ error: "Title is required" });
     }
 
-    if (img) {
-        const imgValidation = await isValidImageUrl(img);
-        if (!imgValidation.valid) {
-            return res.status(400).json({ error: imgValidation.error });
+    if (mainContents) {
+        if (!Array.isArray(mainContents)) {
+            return res.status(400).json({ error: "mainContents must be an array" });
         }
-    }
-
-    if (img2) {
-        const img2Validation = await isValidImageUrl(img2);
-        if (!img2Validation.valid) {
-            return res.status(400).json({ error: img2Validation.error });
+        for (const content of mainContents) {
+            if (content.h2 && (content.h2.length < 5 || content.h2.length > 100)) {
+                return res.status(400).json({ error: "h2 must be between 5 and 100 characters" });
+            }
+            if (content.description && content.description.length < 20) {
+                return res.status(400).json({ error: "description must be at least 20 characters" });
+            }
+            if (content.caption && content.caption.length > 100) {
+                return res.status(400).json({ error: "caption must be at most 100 characters" });
+            }
+            if (content.img) {
+                const imgValidation = await isValidImageUrl(content.img);
+                if (!imgValidation.valid) {
+                    return res.status(400).json({ error: `Invalid image URL in mainContent: ${imgValidation.error}` });
+                }
+            }
         }
     }
 
@@ -109,16 +134,19 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         }
     }
 
+    if (contentOrder) {
+        if (!Array.isArray(contentOrder) || !contentOrder.every(item => item.type === "mainContent")) {
+            return res.status(400).json({ error: "Invalid contentOrder" });
+        }
+    }
+
     try {
         const post = new Post({
             title,
-            description,
-            img: img || "",
-            caption: caption || "",
-            img2: img2 || "",
-            caption2: caption2 || "",
+            mainContents: mainContents || [],
             author: req.user.userId,
             category: category || ["Thể thao"],
+            contentOrder: contentOrder || [],
         });
         await post.save();
 
@@ -149,7 +177,7 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         return res.status(500).json({ error: "Failed to save post", details: error.message });
     }
 });
-// Thêm endpoint để lấy danh sách danh mục
+
 router.get("/categories", apiLimiter, async (req, res) => {
     try {
         res.status(200).json({ categories: VALID_CATEGORIES });
@@ -158,6 +186,7 @@ router.get("/categories", apiLimiter, async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
 router.get("/", apiLimiter, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -181,7 +210,7 @@ router.get("/", apiLimiter, async (req, res) => {
         }
 
         const posts = await Post.find(query)
-            .select("title description img img2 caption caption2 createdAt category slug")
+            .select("title mainContents createdAt category slug contentOrder")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
@@ -224,7 +253,7 @@ router.get("/:identifier", apiLimiter, async (req, res) => {
         const query = isMongoId ? { _id: identifier } : { slug: identifier };
 
         const post = await Post.findOne(query)
-            .select("title description img img2 caption caption2 createdAt category slug")
+            .select("title mainContents createdAt category slug contentOrder")
             .lean();
         if (!post) {
             return res.status(404).json({ error: "Post not found" });
@@ -255,7 +284,7 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
         const query = isMongoId ? { _id: identifier } : { slug: identifier };
 
         const post = await Post.findOne(query)
-            .select("title description img img2 caption caption2 createdAt category slug")
+            .select("title mainContents createdAt category slug contentOrder")
             .lean();
         if (!post) {
             return res.status(404).json({ error: "Post not found" });
@@ -265,7 +294,7 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
             category: { $in: post.category },
             _id: { $ne: post._id }
         })
-            .select("title description img img2 caption caption2 createdAt category slug")
+            .select("title mainContents createdAt category slug contentOrder")
             .sort({ createdAt: -1 })
             .limit(15)
             .lean();
@@ -274,7 +303,7 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
             category: { $in: ["Thể thao"] },
             _id: { $ne: post._id }
         })
-            .select("title description img img2 caption caption2 createdAt category slug")
+            .select("title mainContents createdAt category slug contentOrder")
             .sort({ createdAt: -1 })
             .limit(15)
             .lean();
@@ -289,7 +318,5 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
-
-
 
 module.exports = router;

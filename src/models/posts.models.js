@@ -1,9 +1,7 @@
 const mongoose = require('mongoose');
 
-// Danh sách danh mục tập trung, dễ dàng mở rộng
 const VALID_CATEGORIES = ['Thể thao', 'Đời sống', 'Giải trí', 'Tin hot'];
 
-// Hàm chuyển đổi tiêu đề thành slug không dấu
 const createSlug = (title) => {
     const vietnameseMap = {
         'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
@@ -43,31 +41,36 @@ const createSlug = (title) => {
         .replace(/[ùúủũụưừứửữự]/g, (match) => vietnameseMap[match] || match)
         .replace(/[ỳýỷỹỵ]/g, (match) => vietnameseMap[match] || match)
         .replace(/đ/g, 'd')
-        .replace(/[^a-z0-9\s-]/g, '') // Loại bỏ ký tự đặc biệt
-        .replace(/\s+/g, '-') // Thay khoảng trắng bằng dấu gạch ngang
-        .replace(/-+/g, '-') // Loại bỏ nhiều dấu gạch ngang liên tiếp
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
         .trim();
 };
 
 const postSchema = new mongoose.Schema({
     title: { type: String, required: true },
-    description: { type: String, required: true },
-    img: { type: String },
-    caption: { type: String },
-    img2: { type: String },
-    caption2: { type: String },
+    mainContents: [{
+        h2: { type: String },
+        description: { type: String },
+        img: { type: String },
+        caption: { type: String },
+        isImageFirst: { type: Boolean, default: false },
+    }],
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
     category: {
-        type: [String], // Hỗ trợ mảng danh mục
+        type: [String],
         required: true,
-        enum: VALID_CATEGORIES, // Sử dụng danh sách danh mục tập trung
+        enum: VALID_CATEGORIES,
         default: ['Thể thao']
     },
-    slug: { type: String, required: true, unique: true }
+    slug: { type: String, required: true, unique: true },
+    contentOrder: [{
+        type: { type: String, enum: ["mainContent"], required: true },
+        index: { type: Number, default: 0 },
+    }],
 });
 
-// Tự động tạo slug trước khi validate
 postSchema.pre('validate', function (next) {
     if (this.isModified('title') || !this.slug) {
         this.slug = createSlug(this.title);
@@ -75,7 +78,6 @@ postSchema.pre('validate', function (next) {
     next();
 });
 
-// Kiểm tra và xử lý slug trùng lặp trước khi lưu
 postSchema.pre('save', async function (next) {
     if (this.isModified('slug')) {
         let slug = this.slug;
@@ -90,8 +92,7 @@ postSchema.pre('save', async function (next) {
     next();
 });
 
-// Tạo index cho category và createdAt
 postSchema.index({ category: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Post', postSchema);
-module.exports.VALID_CATEGORIES = VALID_CATEGORIES; // Xuất danh sách danh mục để sử dụng ở nơi khác
+module.exports.VALID_CATEGORIES = VALID_CATEGORIES;
