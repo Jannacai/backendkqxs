@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 
+// Danh sách danh mục tập trung, dễ dàng mở rộng
+const VALID_CATEGORIES = ['Thể thao', 'Đời sống', 'Giải trí', 'Tin hot'];
+
 // Hàm chuyển đổi tiêu đề thành slug không dấu
 const createSlug = (title) => {
     const vietnameseMap = {
@@ -56,10 +59,10 @@ const postSchema = new mongoose.Schema({
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
     category: {
-        type: String,
+        type: [String], // Hỗ trợ mảng danh mục
         required: true,
-        enum: ['Thể thao', 'Đời sống'],
-        default: 'Thể thao'
+        enum: VALID_CATEGORIES, // Sử dụng danh sách danh mục tập trung
+        default: ['Thể thao']
     },
     slug: { type: String, required: true, unique: true }
 });
@@ -78,7 +81,6 @@ postSchema.pre('save', async function (next) {
         let slug = this.slug;
         let count = 1;
         let newSlug = slug;
-        // Sử dụng this.constructor thay vì Post để tránh lỗi undefined
         while (await this.constructor.findOne({ slug: newSlug, _id: { $ne: this._id } })) {
             newSlug = `${slug}-${count}`;
             count++;
@@ -92,3 +94,4 @@ postSchema.pre('save', async function (next) {
 postSchema.index({ category: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Post', postSchema);
+module.exports.VALID_CATEGORIES = VALID_CATEGORIES; // Xuất danh sách danh mục để sử dụng ở nơi khác

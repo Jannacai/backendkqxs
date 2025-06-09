@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
 const Post = require("../../models/posts.models");
+const { VALID_CATEGORIES } = require("../../models/posts.models");
 const redis = require("redis");
 const rateLimit = require("express-rate-limit");
 const fetch = require("node-fetch");
@@ -102,9 +103,10 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         }
     }
 
-    const validCategories = ["Thể thao", "Đời sống"];
-    if (category && !validCategories.includes(category)) {
-        return res.status(400).json({ error: "Invalid category" });
+    if (category) {
+        if (!Array.isArray(category) || category.length === 0 || !category.every(cat => VALID_CATEGORIES.includes(cat))) {
+            return res.status(400).json({ error: "Invalid category" });
+        }
     }
 
     try {
@@ -116,16 +118,18 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
             img2: img2 || "",
             caption2: caption2 || "",
             author: req.user.userId,
-            category: category || "Thể thao",
+            category: category || ["Thể thao"],
         });
         await post.save();
 
-        const cacheKey = `posts:recent:page:1:limit:15:category:${category || 'all'}`;
-        const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            let cachedData = JSON.parse(cached);
-            cachedData.posts = [post.toJSON(), ...cachedData.posts.filter(p => p._id.toString() !== post._id.toString()).slice(0, 14)];
-            await redisClient.setEx(cacheKey, 300, JSON.stringify(cachedData));
+        for (const cat of category || ["Thể thao"]) {
+            const cacheKey = `posts:recent:page:1:limit:15:category:${cat || 'all'}`;
+            const cached = await redisClient.get(cacheKey);
+            if (cached) {
+                let cachedData = JSON.parse(cached);
+                cachedData.posts = [post.toJSON(), ...cachedData.posts.filter(p => p._id.toString() !== post._id.toString()).slice(0, 14)];
+                await redisClient.setEx(cacheKey, 300, JSON.stringify(cachedData));
+            }
         }
 
         const cachedKeys = await redisClient.sMembers("cachedPostKeys");
@@ -165,7 +169,7 @@ router.get("/", apiLimiter, async (req, res) => {
         const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
         let query = { createdAt: { $gte: twoDaysAgo } };
         if (category) {
-            query.category = category;
+            query.category = { $in: [category] };
         }
 
         const posts = await Post.find(query)
@@ -178,7 +182,7 @@ router.get("/", apiLimiter, async (req, res) => {
         const seenIds = new Set();
         const uniquePosts = posts.filter(post => !seenIds.has(post._id) && seenIds.add(post._id));
 
-        const totalPosts = await Post.countDocuments(query); // Thêm dòng này
+        const totalPosts = await Post.countDocuments(query);
 
         const response = {
             posts: uniquePosts,
@@ -250,7 +254,7 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
         }
 
         const related = await Post.find({
-            category: post.category,
+            category: { $in: post.category },
             _id: { $ne: post._id }
         })
             .select("title description img img2 caption caption2 createdAt category slug")
@@ -259,7 +263,7 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
             .lean();
 
         const football = await Post.find({
-            category: "Thể thao",
+            category: { $in: ["Thể thao"] },
             _id: { $ne: post._id }
         })
             .select("title description img img2 caption caption2 createdAt category slug")
@@ -274,6 +278,16 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
         res.status(200).json(response);
     } catch (error) {
         console.error("Error fetching combined post data:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// Thêm endpoint để lấy danh sách danh mục
+router.get("/categories", apiLimiter, async (req, res) => {
+    try {
+        res.status(200).json({ categories: VALID_CATEGORIES });
+    } catch (error) {
+        console.error("Error fetching categories:", error.message);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
