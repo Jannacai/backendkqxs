@@ -19,7 +19,7 @@ const upload = multer({
         if (allowedTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Only images (jpg, jpeg, png, gif, webp) are allowed'), false);
+            cb(new Error('Chỉ cho phép các định dạng ảnh: jpg, jpeg, png, gif, webp'), false);
         }
     },
 });
@@ -66,7 +66,7 @@ router.post('/upload-to-drive', authenticate, restrictToAdmin, upload.single('fi
         }
 
         const credentialsRaw = process.env.GOOGLE_CREDENTIALS_JSON;
-        console.log('Raw GOOGLE_CREDENTIALS_JSON:', credentialsRaw.substring(0, 200) + '...'); // Log 200 ký tự đầu
+        console.log('Raw GOOGLE_CREDENTIALS_JSON:', credentialsRaw.substring(0, 200) + '...');
 
         const credentials = JSON.parse(credentialsRaw);
         console.log('Parsed credentials:', credentials);
@@ -130,7 +130,6 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
             if (content.caption && content.caption.length > 200) {
                 return res.status(400).json({ error: "caption must be at most 200 characters" });
             }
-            // Bỏ kiểm tra bắt buộc URL từ Google Drive
             if (content.img && !/^(https?:\/\/)/.test(content.img)) {
                 return res.status(400).json({ error: "Image URL must be a valid URL" });
             }
@@ -159,7 +158,7 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         });
         await post.save();
 
-        for (const cat of category || ["Thể thao"]) {
+        for (const cat of category || ["Tin hot"]) {
             const cacheKey = `posts:recent:page:1:limit:15:category:${cat || 'all'}`;
             const cached = await redisClient.get(cacheKey);
             if (cached) {
@@ -187,7 +186,6 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
     }
 });
 
-// Các endpoint khác giữ nguyên
 router.get("/categories", apiLimiter, async (req, res) => {
     try {
         res.status(200).json({ categories: VALID_CATEGORIES });
@@ -214,12 +212,8 @@ router.get("/", apiLimiter, async (req, res) => {
 
         const now = new Date();
         const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-        let query = { createdAt: { $gte: twoDaysAgo } };
-        if (category) {
-            query.category = { $in: [category] };
-        }
-
-        const posts = await Post.find(query)
+        let query = category ? { category: { $in: [category] } } : {};
+        let posts = await Post.find(query)
             .select("title mainContents createdAt category slug contentOrder")
             .sort({ createdAt: -1 })
             .skip(skip)
@@ -300,19 +294,21 @@ router.get("/combined/:identifier", apiLimiter, async (req, res) => {
             return res.status(404).json({ error: "Post not found" });
         }
 
-        const related = await Post.find({
+        let relatedQuery = {
             category: { $in: post.category },
             _id: { $ne: post._id }
-        })
+        };
+        let related = await Post.find(relatedQuery)
             .select("title mainContents createdAt category slug contentOrder")
             .sort({ createdAt: -1 })
             .limit(15)
             .lean();
 
-        const football = await Post.find({
+        let footballQuery = {
             category: { $in: ["Thể thao"] },
             _id: { $ne: post._id }
-        })
+        };
+        let football = await Post.find(footballQuery)
             .select("title mainContents createdAt category slug contentOrder")
             .sort({ createdAt: -1 })
             .limit(15)
