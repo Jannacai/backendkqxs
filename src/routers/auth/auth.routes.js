@@ -107,7 +107,7 @@ router.post("/register", validateRegisterInput, async (req, res) => {
         const accessToken = jwt.sign(
             { userId: user._id, role: user.role },
             process.env.JWT_SECRET,
-            { expiresIn: "15m" }
+            { expiresIn: "1h" }
         );
 
         const refreshToken = jwt.sign(
@@ -157,7 +157,7 @@ router.post("/login", validateRegisterInput, async (req, res) => {
         const accessToken = jwt.sign(
             { userId: user._id, role: user.role },
             process.env.JWT_SECRET,
-            { expiresIn: "15m" }
+            { expiresIn: "1h" }
         );
 
         const refreshToken = jwt.sign(
@@ -305,7 +305,7 @@ router.post("/refresh-token", async (req, res) => {
         const accessToken = jwt.sign(
             { userId: user._id, role: user.role },
             process.env.JWT_SECRET,
-            { expiresIn: "15m" }
+            { expiresIn: "1h" }
         );
 
         await user.save();
@@ -340,4 +340,8 @@ router.post("/logout", async (req, res) => {
     }
 });
 
-module.exports = router;
+
+module.exports = {
+    router,
+    authenticate,
+};

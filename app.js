@@ -34,7 +34,7 @@ app.use('/uploads', express.static(uploadsDir, {
 // Khởi tạo middleware
 app.use(cors({
     origin: process.env.FRONTEND_URL, // Giới hạn origin để tăng bảo mật
-    methods: ['GET', 'POST'], // Chỉ cho phép các phương thức cần thiết
+    methods: ['GET', 'POST', 'DELETE'], // Chỉ cho phép các phương thức cần thiết
 }));
 app.use(compression());
 app.use(morgan('dev', { skip: (req, res) => res.statusCode < 400 })); // Chỉ log lỗi
