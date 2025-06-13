@@ -1,21 +1,23 @@
 const mongoose = require('mongoose');
 
 const commentSchema = new mongoose.Schema({
-    content: { type: String, required: true, trim: true },
+    content: { type: String, required: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     likes: { type: Number, default: 0 },
-    likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: [] }],
+    likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     parentComment: { type: mongoose.Schema.Types.ObjectId, ref: 'Comment', default: null },
     depth: { type: Number, default: 0 },
-    taggedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: [] }],
-    childComments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment', default: [] }], // Mảng thực
+    taggedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Người được tag
     createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
 });
 
-commentSchema.pre('save', function (next) {
-    this.updatedAt = Date.now();
-    next();
+commentSchema.virtual('childComments', {
+    ref: 'Comment',
+    localField: '_id',
+    foreignField: 'parentComment',
 });
+
+commentSchema.set('toObject', { virtuals: true });
+commentSchema.set('toJSON', { virtuals: true });
 
 module.exports = mongoose.model('Comment', commentSchema);

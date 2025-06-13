@@ -9,7 +9,7 @@ router.get("/search", authenticate, async (req, res) => {
         const { query } = req.query;
         if (!query) {
             return res.status(400).json({ error: "Query là bắt buộc" });
-        }
+        }z
 
         const users = await userModel
             .find({
