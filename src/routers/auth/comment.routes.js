@@ -68,11 +68,11 @@ router.get("/", async (req, res) => {
                 ],
                 options: { sort: { createdAt: -1 } },
             });
-        console.log("Fetched comments:", comments.map(c => ({
-            id: c._id,
-            createdAt: c.createdAt,
-            childComments: c.childComments?.map(child => child.createdAt) || [],
-        })));
+        // console.log("Fetched comments:", comments.map(c => ({
+        //     id: c._id,
+        //     createdAt: c.createdAt,
+        //     childComments: c.childComments?.map(child => child.createdAt) || [],
+        // })));
         res.status(200).json(comments);
     } catch (error) {
         console.error("Error in /comments:", error.message);
@@ -97,7 +97,7 @@ router.post("/", authenticate, async (req, res) => {
                 return res.status(404).json({ error: "Bình luận cha không tồn tại" });
             }
             depth = parent.depth + 1;
-            console.log("Creating comment:", { content, parentComment, depth });
+            // console.log("Creating comment:", { content, parentComment, depth });
             if (depth > 1) {
                 return res.status(400).json({ error: "Đã đến giới hạn bình luận" });
             }
@@ -126,7 +126,7 @@ router.post("/", authenticate, async (req, res) => {
             }
             parent.childComments.push(comment._id);
             await parent.save();
-            console.log("Updated parent comment:", parent._id, "with child:", comment._id);
+            // console.log("Updated parent comment:", parent._id, "with child:", comment._id);
         }
 
         const currentUser = await userModel.findById(req.user.userId).select("username fullname");
@@ -153,7 +153,7 @@ router.post("/", authenticate, async (req, res) => {
                     content: `${currentUser.fullname || currentUser.username} đã tag bạn trong một bình luận: "${content.slice(0, 50)}..."`,
                 });
                 await notification.save();
-                console.log("Notification sent to tagged user:", taggedUserId);
+                // console.log("Notification sent to tagged user:", taggedUserId);
             }
         }
 
@@ -166,7 +166,7 @@ router.post("/", authenticate, async (req, res) => {
                 content: `${currentUser.fullname} đã trả lời bình luận của bạn: "${content.slice(0, 50)}..."`,
             });
             await notification.save();
-            console.log("Notification sent to parent comment owner:", parentUserId);
+            // console.log("Notification sent to parent comment owner:", parentUserId);
         }
 
         // Gửi thông báo cho người tham gia chủ đề (sibling comments)
@@ -184,7 +184,7 @@ router.post("/", authenticate, async (req, res) => {
                         content: `${currentUser.fullname} đã trả lời trong chủ đề bạn tham gia: "${content.slice(0, 50)}..."`,
                     });
                     await notification.save();
-                    console.log("Notification sent to sibling comment owner:", sibling.createdBy._id);
+                    // console.log("Notification sent to sibling comment owner:", sibling.createdBy._id);
                     notifiedUsers.add(sibling.createdBy._id.toString());
                 }
             }

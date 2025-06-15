@@ -664,7 +664,7 @@ router.post('/telegram', async (req, res) => {
             await bot.sendMessage(chatId, 'Chào bạn! Gõ /xsmb để xem kết quả xổ số miền Bắc.');
         } else if (text === '/xsmb') {
             // Gọi API /xsmb
-            const response = await fetch('http://localhost:3000/xsmb', {
+            const response = await fetch('https://xsmb.win/xsmb', {
                 headers: { 'x-user-id': 'bot' }, // Thêm header để qua rate limiter
             });
             const data = await response.json();

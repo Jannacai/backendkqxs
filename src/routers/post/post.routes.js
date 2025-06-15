@@ -66,10 +66,10 @@ router.post('/upload-to-drive', authenticate, restrictToAdmin, upload.single('fi
         }
 
         const credentialsRaw = process.env.GOOGLE_CREDENTIALS_JSON;
-        console.log('Raw GOOGLE_CREDENTIALS_JSON:', credentialsRaw.substring(0, 200) + '...');
+        // console.log('Raw GOOGLE_CREDENTIALS_JSON:', credentialsRaw.substring(0, 200) + '...');
 
         const credentials = JSON.parse(credentialsRaw);
-        console.log('Parsed credentials:', credentials);
+        // console.log('Parsed credentials:', credentials);
 
         const auth = new google.auth.GoogleAuth({
             credentials: credentials,
@@ -172,7 +172,7 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         if (cachedKeys.length > 0) {
             await redisClient.del(cachedKeys);
             await redisClient.del("cachedPostKeys");
-            console.log("Cleared cache keys:", cachedKeys);
+            // console.log("Cleared cache keys:", cachedKeys);
         }
         await redisClient.del(`post:${post._id}`);
 

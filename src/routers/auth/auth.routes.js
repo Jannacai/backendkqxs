@@ -217,7 +217,7 @@ router.post("/forgot-password", async (req, res) => {
             html: `<p>Nhấn vào liên kết sau để đặt lại mật khẩu của bạn:</p><a href="${resetLink}">${resetLink}</a><p>Liên kết này có hiệu lực trong 1 giờ. Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>`,
         });
 
-        console.log(`Password reset email sent to: ${email}`);
+        // console.log(`Password reset email sent to: ${email}`);
         res.status(200).json({ message: "Link đặt lại mật khẩu đã được gửi tới email của bạn" });
     } catch (error) {
         console.error("Error in /forgot-password:", error.message);
