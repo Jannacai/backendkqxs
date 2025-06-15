@@ -242,7 +242,7 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
         };
 
         let existingData = await redisClient.hGetAll(`kqxs:${targetDate}`);
-        console.log('Dữ liệu Redis ban đầu:', existingData);
+        console.log('Dữ liệu Redis ban đầu từ Redis...:', existingData);
         const metadata = JSON.parse((await redisClient.hGet(`kqxs:${targetDate}:meta`, 'metadata')) || '{}');
 
         for (const key of Object.keys(initialData)) {
