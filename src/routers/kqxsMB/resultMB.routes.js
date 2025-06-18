@@ -140,8 +140,6 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
         };
 
         const mockData = {
-            maDB: '1ER - 13ER - 10ER - 7ER - 4ER - 8ER',
-            specialPrize_0: '12345',
             firstPrize_0: '67890',
             secondPrize_0: '11111',
             secondPrize_1: '22222',
@@ -168,38 +166,40 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
             sevenPrizes_1: '34',
             sevenPrizes_2: '56',
             sevenPrizes_3: '78',
+            maDB: '1ER - 13ER - 10ER - 7ER - 4ER - 8ER',
+            specialPrize_0: '12345',
         };
 
         const simulateLiveDraw = async (data) => {
             const prizeOrder = [
-                { key: 'sevenPrizes_0', delay: 500 },
-                { key: 'sevenPrizes_1', delay: 500 },
-                { key: 'sevenPrizes_2', delay: 500 },
-                { key: 'sevenPrizes_3', delay: 500 },
-                { key: 'sixPrizes_0', delay: 500 },
-                { key: 'sixPrizes_1', delay: 500 },
-                { key: 'sixPrizes_2', delay: 500 },
-                { key: 'fivePrizes_0', delay: 500 },
-                { key: 'fivePrizes_1', delay: 500 },
-                { key: 'fivePrizes_2', delay: 500 },
-                { key: 'fivePrizes_3', delay: 500 },
-                { key: 'fivePrizes_4', delay: 500 },
-                { key: 'fivePrizes_5', delay: 500 },
-                { key: 'fourPrizes_0', delay: 500 },
-                { key: 'fourPrizes_1', delay: 500 },
-                { key: 'fourPrizes_2', delay: 500 },
-                { key: 'fourPrizes_3', delay: 500 },
+                { key: 'firstPrize_0', delay: 500 },
+                { key: 'secondPrize_0', delay: 500 },
+                { key: 'secondPrize_1', delay: 500 },
                 { key: 'threePrizes_0', delay: 500 },
                 { key: 'threePrizes_1', delay: 500 },
                 { key: 'threePrizes_2', delay: 500 },
                 { key: 'threePrizes_3', delay: 500 },
                 { key: 'threePrizes_4', delay: 500 },
                 { key: 'threePrizes_5', delay: 500 },
-                { key: 'secondPrize_0', delay: 500 },
-                { key: 'secondPrize_1', delay: 500 },
-                { key: 'firstPrize_0', delay: 500 },
-                { key: 'specialPrize_0', delay: 500 },
+                { key: 'fourPrizes_0', delay: 500 },
+                { key: 'fourPrizes_1', delay: 500 },
+                { key: 'fourPrizes_2', delay: 500 },
+                { key: 'fourPrizes_3', delay: 500 },
+                { key: 'fivePrizes_0', delay: 500 },
+                { key: 'fivePrizes_1', delay: 500 },
+                { key: 'fivePrizes_2', delay: 500 },
+                { key: 'fivePrizes_3', delay: 500 },
+                { key: 'fivePrizes_4', delay: 500 },
+                { key: 'fivePrizes_5', delay: 500 },
+                { key: 'sixPrizes_0', delay: 500 },
+                { key: 'sixPrizes_1', delay: 500 },
+                { key: 'sixPrizes_2', delay: 500 },
+                { key: 'sevenPrizes_0', delay: 500 },
+                { key: 'sevenPrizes_1', delay: 500 },
+                { key: 'sevenPrizes_2', delay: 500 },
+                { key: 'sevenPrizes_3', delay: 500 },
                 { key: 'maDB', delay: 500 },
+                { key: 'specialPrize_0', delay: 500 },
             ];
 
             for (const { key, delay } of prizeOrder) {
@@ -211,8 +211,6 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
         };
 
         const initialData = {
-            maDB: '...',
-            specialPrize_0: '...',
             firstPrize_0: '...',
             secondPrize_0: '...',
             secondPrize_1: '...',
@@ -239,6 +237,8 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
             sevenPrizes_1: '...',
             sevenPrizes_2: '...',
             sevenPrizes_3: '...',
+            maDB: '...',
+            specialPrize_0: '...',
         };
 
         let existingData = await redisClient.hGetAll(`kqxs:${targetDate}`);
@@ -305,8 +305,6 @@ router.get('/api/kqxs/xsmb/sse/initial', apiLimiter, async (req, res) => {
 
         // Khởi tạo dữ liệu mặc định
         const initialData = {
-            maDB: '...',
-            specialPrize_0: '...',
             firstPrize_0: '...',
             secondPrize_0: '...',
             secondPrize_1: '...',
@@ -333,6 +331,8 @@ router.get('/api/kqxs/xsmb/sse/initial', apiLimiter, async (req, res) => {
             sevenPrizes_1: '...',
             sevenPrizes_2: '...',
             sevenPrizes_3: '...',
+            maDB: '...',
+            specialPrize_0: '...',
             drawDate: targetDate,
             station: station || 'xsmb',
             tentinh: metadata.tentinh || 'Miền Bắc',
