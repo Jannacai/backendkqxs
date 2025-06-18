@@ -165,7 +165,7 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
             sevenPrizes_0: '12',
             sevenPrizes_1: '34',
             sevenPrizes_2: '56',
-            sevenPrizes_3: '78',
+            sevenPrizes_3: '98',
             maDB: '1ER - 13ER - 10ER - 7ER - 4ER - 8ER',
             specialPrize_0: '12345',
         };
