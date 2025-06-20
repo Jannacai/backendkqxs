@@ -5,6 +5,7 @@ const { getLoGanStats, getSpecialPrizeStats, getDauDuoiStats, getDauDuoiStatsByD
 const rateLimit = require('express-rate-limit');
 const redis = require('redis');
 const cron = require('node-cron');
+const moment = require('moment');
 
 // Kết nối Redis
 const redisClient = redis.createClient({
@@ -15,7 +16,47 @@ redisClient.connect().catch(err => console.error('Lỗi kết nối Redis:', err
 // Map lưu trữ subscriber và danh sách client SSE cho mỗi kênh
 const subscribers = new Map(); // channel -> { subscriber, clients: Set }
 
-// Tính toán trước dữ liệu thống kê (chạy lúc 0h mỗi ngày)
+// Danh sách tỉnh theo ngày
+const provincesByDay = {
+    0: {
+        'tien-giang': { tentinh: 'Tiền Giang', tinh: 'tien-giang' },
+        'kien-giang': { tentinh: 'Kiên Giang', tinh: 'kien-giang' },
+        'da-lat': { tentinh: 'Đà Lạt', tinh: 'da-lat' }
+    },
+    1: {
+        'tphcm': { tentinh: 'TP.HCM', tinh: 'tphcm' },
+        'dong-thap': { tentinh: 'Đồng Tháp', tinh: 'dong-thap' },
+        'ca-mau': { tentinh: 'Cà Mau', tinh: 'ca-mau' }
+    },
+    2: {
+        'ben-tre': { tentinh: 'Bến Tre', tinh: 'ben-tre' },
+        'vung-tau': { tentinh: 'Vũng Tàu', tinh: 'vung-tau' },
+        'bac-lieu': { tentinh: 'Bạc Liêu', tinh: 'bac-lieu' }
+    },
+    3: {
+        'dong-nai': { tentinh: 'Đồng Nai', tinh: 'dong-nai' },
+        'can-tho': { tentinh: 'Cần Thơ', tinh: 'can-tho' },
+        'soc-trang': { tentinh: 'Sóc Trăng', tinh: 'soc-trang' }
+    },
+    4: {
+        'tay-ninh': { tentinh: 'Tây Ninh', tinh: 'tay-ninh' },
+        'an-giang': { tentinh: 'An Giang', tinh: 'an-giang' },
+        'binh-thuan': { tentinh: 'Bình Thuận', tinh: 'binh-thuan' }
+    },
+    5: {
+        'vinh-long': { tentinh: 'Vĩnh Long', tinh: 'vinh-long' },
+        'binh-duong': { tentinh: 'Bình Dương', tinh: 'binh-duong' },
+        'tra-vinh': { tentinh: 'Trà Vinh', tinh: 'tra-vinh' }
+    },
+    6: {
+        'tphcm': { tentinh: 'TP.HCM', tinh: 'tphcm' },
+        'long-an': { tentinh: 'Long An', tinh: 'long-an' },
+        'binh-phuoc': { tentinh: 'Bình Phước', tinh: 'binh-phuoc' },
+        'hau-giang': { tentinh: 'Hậu Giang', tinh: 'hau-giang' }
+    }
+};
+
+// Tính toán trước dữ liệu thống kê (chạy lúc 16h40 mỗi ngày)
 cron.schedule('40 16 * * *', async () => {
     console.log('Tính toán trước thống kê lô gan XSMN...');
     const daysOptions = [6, 7, 14, 30, 60];
@@ -100,139 +141,135 @@ const mapDayOfWeek = (dayOfWeekNoAccent) => {
 // SSE cho XSMN
 router.get('/xsmn/sse', sseLimiter, async (req, res) => {
     try {
-        const { date, simulate, tinh } = req.query;
+        const { date, station, tinh, simulate } = req.query;
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? date
             : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+        const province = provincesByDay[new Date(targetDate.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1')).getDay()]?.[tinh] || provincesByDay[6]?.[tinh];
+        if (!province || !tinh) {
+            return res.status(400).end('Tỉnh không hợp lệ hoặc không được cung cấp.');
+        }
         const isSimulate = simulate === 'true';
-        const province = tinh || 'vung-tau';
-        const redisKey = `kqxs:xsmn:${targetDate}:${province}`;
-        const channel = `xsmn:${targetDate}:${province}`;
+        console.log('SSE XSMN:', { targetDate, station, tinh, isSimulate });
 
-        console.log(`SSE request: date=${targetDate}, simulate=${isSimulate}, tinh=${province}, redisKey=${redisKey}`);
-
-        // Thiết lập header cho SSE
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('Content-Encoding', 'identity');
         res.flushHeaders();
 
-        const provinces = {
-            'vung-tau': 'Vũng Tàu',
-            'can-tho': 'Cần Thơ',
-            'dong-thap': 'Đồng Tháp',
-            'tphcm': 'TP.HCM',
-            'ca-mau': 'Cà Mau',
-            'ben-tre': 'Bến Tre',
-            'bac-lieu': 'Bạc Liêu',
-            'soc-trang': 'Sóc Trăng',
-            'dong-nai': 'Đồng Nai',
-            'an-giang': 'An Giang',
-            'tay-ninh': 'Tây Ninh',
-            'binh-thuan': 'Bình Thuận',
-            'vinh-long': 'Vĩnh Long',
-            'tra-vinh': 'Trà Vinh',
-            'long-an': 'Long An',
-            'binh-phuoc': 'Bình Phước',
-            'hau-giang': 'Hậu Giang',
-            'kien-giang': 'Kiên Giang',
-            'tien-giang': 'Tiền Giang',
-            'da-lat': 'Đà Lạt'
-        };
-
-        const tentinh = provinces[province] || province;
-
-        const sendData = async (type, data) => {
+        const sendData = async (prizeType, prizeData, additionalData = {}) => {
             try {
-                res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
+                const data = {
+                    [prizeType]: prizeData,
+                    drawDate: targetDate,
+                    tentinh: additionalData.tentinh || province.tentinh,
+                    tinh: additionalData.tinh || province.tinh,
+                    year: additionalData.year || new Date().getFullYear(),
+                    month: additionalData.month || new Date().getMonth() + 1,
+                };
+                await redisClient.hSet(`kqxs:xsmn:${targetDate}:${tinh}`, prizeType, JSON.stringify(prizeData));
+                await redisClient.hSet(`kqxs:xsmn:${targetDate}:${tinh}:meta`, 'metadata', JSON.stringify(additionalData));
+                await redisClient.expire(`kqxs:xsmn:${targetDate}:${tinh}`, 7200);
+                await redisClient.expire(`kqxs:xsmn:${targetDate}:${tinh}:meta`, 7200);
+                res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
                 res.flush();
-                console.log(`Gửi SSE: type=${type}, province=${province}, date=${targetDate}`, data);
+                console.log(`Gửi SSE XSMN: ${prizeType} cho tỉnh ${tinh}, ngày ${targetDate}`);
             } catch (error) {
-                console.error(`Lỗi gửi SSE (${type}):`, error.message);
+                console.error(`Lỗi gửi SSE (${prizeType}):`, error);
             }
         };
 
         const mockData = {
-            eightPrizes: ['12'],
-            sevenPrizes: ['123'],
-            sixPrizes: ['1234', '5678', '9012'],
-            fivePrizes: ['12345'],
-            fourPrizes: ['12345', '67890', '23456', '78901', '34567', '89012', '45678'],
-            threePrizes: ['12345', '67890'],
-            secondPrize: ['12345'],
-            firstPrize: ['12345'],
-            specialPrize: ['123456']
+            eightPrizes_0: '12',
+            sevenPrizes_0: '840',
+            sixPrizes_0: '4567',
+            sixPrizes_1: '8901',
+            sixPrizes_2: '2345',
+            fivePrizes_0: '6789',
+            fourPrizes_0: '1234',
+            fourPrizes_1: '5678',
+            fourPrizes_2: '9012',
+            fourPrizes_3: '3456',
+            fourPrizes_4: '7890',
+            fourPrizes_5: '2345',
+            fourPrizes_6: '6789',
+            threePrizes_0: '0123',
+            threePrizes_1: '4567',
+            secondPrize_0: '89012',
+            firstPrize_0: '34567',
+            specialPrize_0: '12345',
         };
 
         const simulateLiveDraw = async (data) => {
             const prizeOrder = [
-                { key: 'eightPrizes', delay: 1000 },
-                { key: 'sevenPrizes', delay: 1000 },
-                { key: 'sixPrizes', delay: 1000 },
-                { key: 'fivePrizes', delay: 1000 },
-                { key: 'fourPrizes', delay: 1000 },
-                { key: 'threePrizes', delay: 1000 },
-                { key: 'secondPrize', delay: 1000 },
-                { key: 'firstPrize', delay: 1000 },
-                { key: 'specialPrize', delay: 1000 }
+                { key: 'eightPrizes_0', delay: 500 },
+                { key: 'sevenPrizes_0', delay: 500 },
+                { key: 'sixPrizes_0', delay: 500 },
+                { key: 'sixPrizes_1', delay: 500 },
+                { key: 'sixPrizes_2', delay: 500 },
+                { key: 'fivePrizes_0', delay: 500 },
+                { key: 'fourPrizes_0', delay: 500 },
+                { key: 'fourPrizes_1', delay: 500 },
+                { key: 'fourPrizes_2', delay: 500 },
+                { key: 'fourPrizes_3', delay: 500 },
+                { key: 'fourPrizes_4', delay: 500 },
+                { key: 'fourPrizes_5', delay: 500 },
+                { key: 'fourPrizes_6', delay: 500 },
+                { key: 'threePrizes_0', delay: 500 },
+                { key: 'threePrizes_1', delay: 500 },
+                { key: 'secondPrize_0', delay: 500 },
+                { key: 'firstPrize_0', delay: 500 },
+                { key: 'specialPrize_0', delay: 500 },
             ];
-
             for (const { key, delay } of prizeOrder) {
                 if (data[key]) {
-                    await sendData('update', { [key]: data[key], tentinh, tinh: province, drawDate: targetDate });
+                    await sendData(key, data[key], { tentinh: province.tentinh, tinh: province.tinh, year: 2025, month: 6 });
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
         };
 
-        const existingData = await redisClient.hGetAll(redisKey);
-        console.log('Dữ liệu Redis ban đầu:', Object.keys(existingData));
-        const metadata = JSON.parse(existingData.metadata || '{}');
-
         const initialData = {
-            eightPrizes: JSON.parse(existingData.eightPrizes_0 || '["..."]'),
-            sevenPrizes: JSON.parse(existingData.sevenPrizes_0 || '["..."]'),
-            sixPrizes: [
-                JSON.parse(existingData.sixPrizes_0 || '"..."'),
-                JSON.parse(existingData.sixPrizes_1 || '"..."'),
-                JSON.parse(existingData.sixPrizes_2 || '"..."')
-            ],
-            fivePrizes: JSON.parse(existingData.fivePrizes_0 || '["..."]'),
-            fourPrizes: [
-                JSON.parse(existingData.fourPrizes_0 || '"..."'),
-                JSON.parse(existingData.fourPrizes_1 || '"..."'),
-                JSON.parse(existingData.fourPrizes_2 || '"..."'),
-                JSON.parse(existingData.fourPrizes_3 || '"..."'),
-                JSON.parse(existingData.fourPrizes_4 || '"..."'),
-                JSON.parse(existingData.fourPrizes_5 || '"..."'),
-                JSON.parse(existingData.fourPrizes_6 || '"..."')
-            ],
-            threePrizes: [
-                JSON.parse(existingData.threePrizes_0 || '"..."'),
-                JSON.parse(existingData.threePrizes_1 || '"..."')
-            ],
-            secondPrize: JSON.parse(existingData.secondPrize_0 || '["..."]'),
-            firstPrize: JSON.parse(existingData.firstPrize_0 || '["..."]'),
-            specialPrize: JSON.parse(existingData.specialPrize_0 || '["..."]'),
-            tentinh: metadata.tentinh || tentinh,
-            tinh: metadata.tinh || province,
-            drawDate: targetDate,
-            year: metadata.year || new Date().getFullYear(),
-            month: metadata.month || new Date().getMonth() + 1
+            eightPrizes_0: '...',
+            sevenPrizes_0: '...',
+            sixPrizes_0: '...',
+            sixPrizes_1: '...',
+            sixPrizes_2: '...',
+            fivePrizes_0: '...',
+            fourPrizes_0: '...',
+            fourPrizes_1: '...',
+            fourPrizes_2: '...',
+            fourPrizes_3: '...',
+            fourPrizes_4: '...',
+            fourPrizes_5: '...',
+            fourPrizes_6: '...',
+            threePrizes_0: '...',
+            threePrizes_1: '...',
+            secondPrize_0: '...',
+            firstPrize_0: '...',
+            specialPrize_0: '...',
         };
 
-        await sendData('initial', initialData);
+        let existingData = await redisClient.hGetAll(`kqxs:xsmn:${targetDate}:${tinh}`);
+        const metadata = JSON.parse((await redisClient.hGet(`kqxs:xsmn:${targetDate}:${tinh}:meta`, 'metadata')) || '{}');
+        for (const key of Object.keys(initialData)) {
+            if (existingData[key]) {
+                initialData[key] = JSON.parse(existingData[key]);
+            }
+        }
 
         if (isSimulate) {
-            const dataToUse = Object.keys(existingData).length > 0
-                ? Object.fromEntries(Object.entries(existingData).map(([key, value]) => [key, JSON.parse(value)]))
-                : mockData;
-            await simulateLiveDraw(dataToUse);
+            await simulateLiveDraw(mockData);
             res.end();
             return;
         }
 
+        for (const [prizeType, prizeData] of Object.entries(initialData)) {
+            await sendData(prizeType, prizeData, metadata);
+        }
+
+        const channel = `xsmn:${targetDate}:${tinh}`;
         if (!subscribers.has(channel)) {
             const subscriber = redis.createClient({ url: process.env.REDIS_URL });
             await subscriber.connect().catch(async (err) => {
@@ -243,36 +280,12 @@ router.get('/xsmn/sse', sseLimiter, async (req, res) => {
             subscriber.subscribe(channel, async (message) => {
                 console.log(`Nhận Redis message trên kênh ${channel}: ${message}`);
                 try {
-                    const { prizeType, prizeData, tinh, drawDate } = JSON.parse(message);
+                    const { prizeType, prizeData, tentinh, tinh, year, month } = JSON.parse(message);
                     if (prizeType && prizeData !== undefined) {
-                        let data = { tentinh: provinces[tinh] || tinh, tinh, drawDate };
-                        if (prizeType.includes('_')) {
-                            const [basePrizeType, index] = prizeType.split('_');
-                            const redisKey = `kqxs:xsmn:${drawDate}:${tinh}`;
-                            const existingArray = [];
-                            const prizeCount = {
-                                specialPrize: 1, firstPrize: 1, secondPrize: 1, threePrizes: 2,
-                                fourPrizes: 7, fivePrizes: 1, sixPrizes: 3, sevenPrizes: 1, eightPrizes: 1
-                            }[basePrizeType] || 1;
-                            for (let i = 0; i < prizeCount; i++) {
-                                const value = await redisClient.hGet(redisKey, `${basePrizeType}_${i}`);
-                                existingArray[i] = value ? JSON.parse(value) : '...';
-                            }
-                            existingArray[parseInt(index)] = prizeData;
-                            await redisClient.hSet(redisKey, basePrizeType, JSON.stringify(existingArray));
-                            data[basePrizeType] = existingArray;
-                        } else {
-                            data[prizeType] = prizeData;
-                        }
-
-                        subscribers.get(channel)?.clients.forEach(client => {
-                            client.write(`data: ${JSON.stringify({ type: 'update', data })}\n\n`);
-                            client.flush();
-                        });
-                        console.log(`Gửi SSE update cho ${prizeType} trên kênh ${channel}`);
+                        await sendData(prizeType, prizeData, { tentinh, tinh, year, month });
                     }
                 } catch (error) {
-                    console.error(`Lỗi xử lý Redis message trên kênh ${channel}:`, error.message);
+                    console.error(`Lỗi xử lý Redis message trên kênh ${channel}:`, error);
                 }
             });
 
@@ -293,7 +306,7 @@ router.get('/xsmn/sse', sseLimiter, async (req, res) => {
             const channelData = subscribers.get(channel);
             if (channelData) {
                 channelData.clients.delete(res);
-                console.log(`Client ngắt kết nối SSE cho ${redisKey}. Số client còn lại: ${channelData.clients.size}`);
+                console.log(`Client ngắt kết nối SSE cho kqxs:xsmn:${targetDate}:${tinh}. Số client còn lại: ${channelData.clients.size}`);
                 if (channelData.clients.size === 0) {
                     await channelData.subscriber.quit();
                     subscribers.delete(channel);
@@ -303,9 +316,8 @@ router.get('/xsmn/sse', sseLimiter, async (req, res) => {
             res.end();
         });
     } catch (error) {
-        console.error('Lỗi khi thiết lập SSE:', error.message);
-        res.write(`data: ${JSON.stringify({ type: 'error', error: 'Lỗi server SSE' })}\n\n`);
-        res.end();
+        console.error('Lỗi khi thiết lập SSE XSMN:', error);
+        res.status(500).end();
     }
 });
 
