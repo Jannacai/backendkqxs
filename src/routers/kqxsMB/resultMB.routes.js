@@ -12,7 +12,6 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN'; // Dùng biến môi trường hoặc hardcode tạm
 const bot = new TelegramBot(token);
 
-
 // Kết nối Redis
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -100,8 +99,69 @@ const mapDayOfWeek = (dayOfWeekNoAccent) => {
     };
     return dayMap[dayOfWeekNoAccent.toLowerCase()] || dayOfWeekNoAccent;
 };
+router.get('/xsmb/sse/initial', apiLimiter, async (req, res) => {
+    try {
+        const { date, station } = req.query;
+        const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
+            ? date
+            : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
 
+        // Lấy dữ liệu từ Redis
+        let existingData = await redisClient.hGetAll(`kqxs:${targetDate}`);
+        const metadata = JSON.parse((await redisClient.hGet(`kqxs:${targetDate}:meta`, 'metadata')) || '{}');
 
+        // Khởi tạo dữ liệu mặc định
+        const initialData = {
+            firstPrize_0: '...',
+            secondPrize_0: '...',
+            secondPrize_1: '...',
+            threePrizes_0: '...',
+            threePrizes_1: '...',
+            threePrizes_2: '...',
+            threePrizes_3: '...',
+            threePrizes_4: '...',
+            threePrizes_5: '...',
+            fourPrizes_0: '...',
+            fourPrizes_1: '...',
+            fourPrizes_2: '...',
+            fourPrizes_3: '...',
+            fivePrizes_0: '...',
+            fivePrizes_1: '...',
+            fivePrizes_2: '...',
+            fivePrizes_3: '...',
+            fivePrizes_4: '...',
+            fivePrizes_5: '...',
+            sixPrizes_0: '...',
+            sixPrizes_1: '...',
+            sixPrizes_2: '...',
+            sevenPrizes_0: '...',
+            sevenPrizes_1: '...',
+            sevenPrizes_2: '...',
+            sevenPrizes_3: '...',
+            maDB: '...',
+            specialPrize_0: '...',
+            drawDate: targetDate,
+            station: station || 'xsmb',
+            tentinh: metadata.tentinh || 'Miền Bắc',
+            tinh: metadata.tinh || 'MB',
+            year: metadata.year || new Date().getFullYear(),
+            month: metadata.month || new Date().getMonth() + 1,
+            dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
+        };
+
+        // Cập nhật dữ liệu từ Redis nếu có
+        for (const key of Object.keys(existingData)) {
+            if (initialData[key]) {
+                initialData[key] = JSON.parse(existingData[key]);
+            }
+        }
+
+        res.status(200).json(initialData);
+    } catch (error) {
+        console.error('Lỗi khi lấy trạng thái ban đầu từ Redis:', error);
+        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
+    }
+});
 router.get('/xsmb/sse', sseLimiter, async (req, res) => {
     try {
         const { date, simulate, station } = req.query;
@@ -119,6 +179,13 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
 
         const sendData = async (prizeType, prizeData, additionalData = {}) => {
             try {
+                if (prizeData === '...') {
+                    const currentData = await redisClient.hGet(`kqxs:${targetDate}`, prizeType);
+                    if (currentData && JSON.parse(currentData) !== '...') {
+                        console.warn(`Bỏ qua ghi ${prizeType} = "..." vì đã có giá trị: ${currentData}`);
+                        return;
+                    }
+                }
                 const data = {
                     [prizeType]: prizeData,
                     drawDate: targetDate,
@@ -292,69 +359,6 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
     }
 });
 
-router.get('/api/kqxs/xsmb/sse/initial', apiLimiter, async (req, res) => {
-    try {
-        const { date, station } = req.query;
-        const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
-            ? date
-            : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-
-        // Lấy dữ liệu từ Redis
-        let existingData = await redisClient.hGetAll(`kqxs:${targetDate}`);
-        const metadata = JSON.parse((await redisClient.hGet(`kqxs:${targetDate}:meta`, 'metadata')) || '{}');
-
-        // Khởi tạo dữ liệu mặc định
-        const initialData = {
-            firstPrize_0: '...',
-            secondPrize_0: '...',
-            secondPrize_1: '...',
-            threePrizes_0: '...',
-            threePrizes_1: '...',
-            threePrizes_2: '...',
-            threePrizes_3: '...',
-            threePrizes_4: '...',
-            threePrizes_5: '...',
-            fourPrizes_0: '...',
-            fourPrizes_1: '...',
-            fourPrizes_2: '...',
-            fourPrizes_3: '...',
-            fivePrizes_0: '...',
-            fivePrizes_1: '...',
-            fivePrizes_2: '...',
-            fivePrizes_3: '...',
-            fivePrizes_4: '...',
-            fivePrizes_5: '...',
-            sixPrizes_0: '...',
-            sixPrizes_1: '...',
-            sixPrizes_2: '...',
-            sevenPrizes_0: '...',
-            sevenPrizes_1: '...',
-            sevenPrizes_2: '...',
-            sevenPrizes_3: '...',
-            maDB: '...',
-            specialPrize_0: '...',
-            drawDate: targetDate,
-            station: station || 'xsmb',
-            tentinh: metadata.tentinh || 'Miền Bắc',
-            tinh: metadata.tinh || 'MB',
-            year: metadata.year || new Date().getFullYear(),
-            month: metadata.month || new Date().getMonth() + 1,
-            dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
-        };
-
-        // Cập nhật dữ liệu từ Redis nếu có
-        for (const key of Object.keys(existingData)) {
-            if (initialData[key]) {
-                initialData[key] = JSON.parse(existingData[key]);
-            }
-        }
-
-        res.status(200).json(initialData);
-    } catch (error) {
-        console.error('Lỗi khi lấy trạng thái ban đầu từ Redis:', error);
-        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
-    }
-});
 
 
 // Route lấy kết quả xổ số trong khoảng thời gian
@@ -588,6 +592,7 @@ router.get('/xsmb/:dayOfWeek', apiLimiter, async (req, res) => {
         res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
     }
 });
+
 // Danh sách KQXS theo tỉnh (trả về bản ghi theo tỉnh)
 router.get('/xsmb/tinh/:tinh', apiLimiter, async (req, res) => {
     const { tinh } = req.params;
@@ -616,6 +621,7 @@ router.get('/xsmb/tinh/:tinh', apiLimiter, async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
 router.get('/xsmb/statistics/gan', statsLimiter, async (req, res) => {
     req.query.station = 'xsmb';
     await getLoGanStats(req, res);
@@ -654,6 +660,7 @@ router.get('/xsmb/statistics/tan-suat-lo-cap', statsLimiter, async (req, res) =>
 router.get('/xsmb/soicau/soi-cau-bach-thu', statsLimiter, async (req, res) => {
     await getBachThuMB(req, res);
 });
+
 router.post('/telegram', async (req, res) => {
     try {
         const update = req.body;
@@ -693,4 +700,6 @@ router.post('/telegram', async (req, res) => {
         return res.status(500).end();
     }
 });
+
 module.exports = router;
+//  cần test thử(21/06)
