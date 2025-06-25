@@ -463,7 +463,28 @@ router.get('/xsmt/sse', sseLimiter, async (req, res) => {
         res.status(500).end();
     }
 });
+// Danh sách KQXS (trả về tất cả, sắp xếp theo ngày mới nhất)
+router.get('/xsmt', apiLimiter, async (req, res) => {
+    try {
+        const cacheKey = `kqxs:xsmt:all`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
 
+        const results = await XSMT.find().lean()
+            .sort({ drawDate: -1 });
+
+        if (!results.length) {
+            return res.status(404).json({ error: 'Result not found' });
+        }
+
+        await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 // Danh sách tỉnh XSMT theo ngày
 router.get('/xsmt/provinces', apiLimiter, async (req, res) => {
     try {
