@@ -8,13 +8,13 @@ const compression = require("compression");
 const path = require("path");
 const routes = require("./src/routers/index");
 const fs = require("fs");
-const WebSocket = require("ws");
 require("dotenv").config();
+const { initializeWebSocket } = require("./src/websocket");
+
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
 
 app.set("trust proxy", 1);
 
@@ -59,51 +59,6 @@ mongoose
     .then(() => console.log("Đã kết nối với MongoDB"))
     .catch((err) => console.error("Lỗi kết nối MongoDB:", err));
 
-// Khởi tạo WebSocket
-wss.on("connection", (ws, req) => {
-    const token = new URLSearchParams(req.url.slice(2)).get("token");
-    if (!token) {
-        ws.close(4000, "Không có token");
-        return;
-    }
-
-    try {
-        const jwt = require("jsonwebtoken");
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        ws.userId = decoded.userId;
-        console.log("Client WebSocket đã kết nối:", ws.userId);
-
-        ws.on("message", (message) => {
-            console.log("Tin nhắn WebSocket nhận được:", message.toString());
-        });
-
-        ws.on("close", () => {
-            console.log("Client WebSocket đã ngắt kết nối:", ws.userId);
-        });
-
-        ws.on("error", (error) => {
-            console.error("Lỗi WebSocket client:", error.message);
-        });
-    } catch (err) {
-        console.error("Lỗi xác thực WebSocket:", err.message);
-        ws.close(4001, "Token không hợp lệ");
-    }
-});
-
-// Hàm broadcast bình luận
-const broadcastComment = (comment) => {
-    console.log("Đang broadcast bình luận:", comment._id);
-    wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN && client.userId) {
-            console.log("Gửi đến client:", client.userId);
-            client.send(JSON.stringify({ type: "NEW_COMMENT", data: comment }));
-        }
-    });
-};
-
-// Lưu broadcastComment vào app
-app.set("broadcastComment", broadcastComment);
-
 // Gắn route xử lý webhook Telegram
 app.use("/webhook", telegramWebhookRouter);
 
@@ -129,6 +84,9 @@ const setTelegramWebhook = async () => {
 
 // Gọi hàm thiết lập webhook khi server khởi động
 setTelegramWebhook();
+
+// Khởi tạo WebSocket
+initializeWebSocket(server);
 
 // Gắn các route khác
 routes(app);
