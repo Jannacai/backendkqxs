@@ -8,21 +8,21 @@ const compression = require("compression");
 const path = require("path");
 const routes = require("./src/routers/index");
 const fs = require("fs");
+const WebSocket = require("ws");
 require("dotenv").config();
-const { initializeWebSocket } = require("./src/websocket");
-
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
 const app = express();
 const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
 app.set("trust proxy", 1);
 
 // Tạo thư mục uploads nếu chưa tồn tại
-const UploadsDir = path.join(__dirname, "Uploads");
+const uploadsDir = path.join(__dirname, "Uploads");
 if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(UploadsDir);
-    console.log("Created uploads directory:", uploadsDir);
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log("Đã tạo thư mục uploads tại:", uploadsDir);
 }
 
 // Phục vụ file tĩnh từ thư mục uploads
@@ -30,7 +30,7 @@ app.use(
     "/uploads",
     express.static(uploadsDir, {
         setHeaders: (res, filePath) => {
-            res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL);
+            res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:3000");
         },
     })
 );
@@ -38,8 +38,9 @@ app.use(
 // Khởi tạo middleware
 app.use(
     cors({
-        origin: process.env.FRONTEND_URL,
-        methods: ["GET", "POST", "DELETE"],
+        origin: process.env.FRONTEND_URL || "http://localhost:3000",
+        methods: ["GET", "POST", "DELETE", "PUT"],
+        credentials: true,
     })
 );
 app.use(compression());
@@ -55,8 +56,53 @@ mongoose
         minPoolSize: 2,
         serverSelectionTimeoutMS: 5000,
     })
-    .then(() => console.log("Connected to MongoDB"))
-    .catch((err) => console.error("MongoDB connection error:", err));
+    .then(() => console.log("Đã kết nối với MongoDB"))
+    .catch((err) => console.error("Lỗi kết nối MongoDB:", err));
+
+// Khởi tạo WebSocket
+wss.on("connection", (ws, req) => {
+    const token = new URLSearchParams(req.url.slice(2)).get("token");
+    if (!token) {
+        ws.close(4000, "Không có token");
+        return;
+    }
+
+    try {
+        const jwt = require("jsonwebtoken");
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        ws.userId = decoded.userId;
+        console.log("Client WebSocket đã kết nối:", ws.userId);
+
+        ws.on("message", (message) => {
+            console.log("Tin nhắn WebSocket nhận được:", message.toString());
+        });
+
+        ws.on("close", () => {
+            console.log("Client WebSocket đã ngắt kết nối:", ws.userId);
+        });
+
+        ws.on("error", (error) => {
+            console.error("Lỗi WebSocket client:", error.message);
+        });
+    } catch (err) {
+        console.error("Lỗi xác thực WebSocket:", err.message);
+        ws.close(4001, "Token không hợp lệ");
+    }
+});
+
+// Hàm broadcast bình luận
+const broadcastComment = (comment) => {
+    console.log("Đang broadcast bình luận:", comment._id);
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN && client.userId) {
+            console.log("Gửi đến client:", client.userId);
+            client.send(JSON.stringify({ type: "NEW_COMMENT", data: comment }));
+        }
+    });
+};
+
+// Lưu broadcastComment vào app
+app.set("broadcastComment", broadcastComment);
 
 // Gắn route xử lý webhook Telegram
 app.use("/webhook", telegramWebhookRouter);
@@ -84,16 +130,13 @@ const setTelegramWebhook = async () => {
 // Gọi hàm thiết lập webhook khi server khởi động
 setTelegramWebhook();
 
-// Khởi tạo WebSocket
-initializeWebSocket(server);
-
 // Gắn các route khác
 routes(app);
 
 // Xử lý lỗi toàn cục để tránh crash
 app.use((err, req, res, next) => {
-    console.error("Unhandled error:", err.message);
-    res.status(500).send("Internal Server Error");
+    console.error("Lỗi chưa xử lý:", err.message);
+    res.status(500).send("Lỗi máy chủ");
 });
 
 module.exports = { app, server };
