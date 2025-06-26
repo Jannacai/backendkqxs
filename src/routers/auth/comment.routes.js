@@ -6,6 +6,20 @@ const commentModel = require("../../models/comments.models");
 const userModel = require("../../models/users.models.js");
 const notificationModel = require("../../models/notification.models.js");
 const { authenticate } = require("./auth.routes.js");
+const rateLimit = require("express-rate-limit");
+const { broadcastComment } = require("../../websocket.js");
+
+const commentLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    message: "Quá nhiều bình luận. Vui lòng thử lại sau 1 phút.",
+});
+
+const likeLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    message: "Quá nhiều lượt thích. Vui lòng thử lại sau 1 phút.",
+});
 
 const restrictToAdmin = async (req, res, next) => {
     try {
@@ -20,12 +34,16 @@ const restrictToAdmin = async (req, res, next) => {
     }
 };
 
-// GET /api/comments - Public endpoint, không cần xác thực
 router.get("/", async (req, res) => {
     try {
+        const { page = 1, limit = 20 } = req.query;
+        const skip = (page - 1) * limit;
+
         const comments = await commentModel
             .find({ parentComment: null })
             .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(Number(limit))
             .populate("createdBy", "username fullname role")
             .populate("taggedUsers", "username fullname role")
             .populate({
@@ -33,54 +51,18 @@ router.get("/", async (req, res) => {
                 populate: [
                     { path: "createdBy", select: "username fullname role" },
                     { path: "taggedUsers", select: "username fullname role" },
-                    {
-                        path: "childComments",
-                        populate: [
-                            { path: "createdBy", select: "username fullname role" },
-                            { path: "taggedUsers", select: "username fullname role" },
-                            {
-                                path: "childComments",
-                                populate: [
-                                    { path: "createdBy", select: "username fullname role" },
-                                    { path: "taggedUsers", select: "username fullname role" },
-                                    {
-                                        path: "childComments",
-                                        populate: [
-                                            { path: "createdBy", select: "username fullname role" },
-                                            { path: "taggedUsers", select: "username fullname role" },
-                                            {
-                                                path: "childComments",
-                                                populate: [
-                                                    { path: "createdBy", select: "username fullname role" },
-                                                    { path: "taggedUsers", select: "username fullname role" },
-                                                ],
-                                                options: { sort: { createdAt: -1 } },
-                                            },
-                                        ],
-                                        options: { sort: { createdAt: -1 } },
-                                    },
-                                ],
-                                options: { sort: { createdAt: -1 } },
-                            },
-                        ],
-                        options: { sort: { createdAt: -1 } },
-                    },
                 ],
                 options: { sort: { createdAt: -1 } },
             });
-        // console.log("Fetched comments:", comments.map(c => ({
-        //     id: c._id,
-        //     createdAt: c.createdAt,
-        //     childComments: c.childComments?.map(child => child.createdAt) || [],
-        // })));
+
         res.status(200).json(comments);
     } catch (error) {
-        console.error("Error in /comments:", error.message);
+        console.error("Error in GET /comments:", error.message);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-router.post("/", authenticate, async (req, res) => {
+router.post("/", authenticate, commentLimiter, async (req, res) => {
     const { content, parentComment, taggedUsers } = req.body;
 
     if (!content || !content.trim()) {
@@ -93,107 +75,92 @@ router.post("/", authenticate, async (req, res) => {
         if (parentComment) {
             parent = await commentModel.findById(parentComment);
             if (!parent) {
-                console.error("Parent comment not found:", parentComment);
                 return res.status(404).json({ error: "Bình luận cha không tồn tại" });
             }
             depth = parent.depth + 1;
-            // console.log("Creating comment:", { content, parentComment, depth });
             if (depth > 1) {
                 return res.status(400).json({ error: "Đã đến giới hạn bình luận" });
             }
         }
 
-        let validTaggedUsers = [];
-        if (taggedUsers && Array.isArray(taggedUsers)) {
-            const users = await userModel.find({ _id: { $in: taggedUsers } });
-            validTaggedUsers = users.map(user => user._id);
-        }
+        const [validTaggedUsers, currentUser] = await Promise.all([
+            taggedUsers && Array.isArray(taggedUsers)
+                ? userModel.find({ _id: { $in: taggedUsers } }).select("_id")
+                : Promise.resolve([]),
+            userModel.findById(req.user.userId).select("username fullname"),
+        ]);
 
         const comment = new commentModel({
             content,
             createdBy: req.user.userId,
             parentComment: parentComment || null,
             depth,
-            taggedUsers: validTaggedUsers,
+            taggedUsers: validTaggedUsers.map(user => user._id),
             likes: 0,
             likedBy: [],
         });
-        await comment.save();
 
-        if (parent) {
-            if (!parent.childComments) {
-                parent.childComments = [];
-            }
-            parent.childComments.push(comment._id);
-            await parent.save();
-            // console.log("Updated parent comment:", parent._id, "with child:", comment._id);
-        }
+        const [savedComment] = await Promise.all([
+            comment.save(),
+            parent ? parent.updateOne({ $push: { childComments: comment._id } }) : Promise.resolve(),
+        ]);
 
-        const currentUser = await userModel.findById(req.user.userId).select("username fullname");
+        const populatedComment = await commentModel
+            .findById(savedComment._id)
+            .populate("createdBy", "username fullname role")
+            .populate("taggedUsers", "username fullname role");
 
-        // Tìm tất cả comment cha ở mọi cấp
-        const parentCommentIds = new Set();
-        let currentComment = parentComment ? await commentModel.findById(parentComment).populate('createdBy') : null;
-        while (currentComment) {
-            if (currentComment.createdBy && currentComment.createdBy._id.toString() !== req.user.userId.toString()) {
-                parentCommentIds.add(currentComment.createdBy._id.toString());
-            }
-            currentComment = currentComment.parentComment
-                ? await commentModel.findById(currentComment.parentComment).populate('createdBy')
-                : null;
-        }
-
-        // Gửi thông báo cho người được tag
+        const notifications = [];
         for (const taggedUserId of validTaggedUsers) {
             if (taggedUserId.toString() !== req.user.userId.toString()) {
-                const notification = new notificationModel({
+                notifications.push({
                     userId: taggedUserId,
-                    commentId: comment._id,
+                    commentId: savedComment._id,
                     taggedBy: req.user.userId,
                     content: `${currentUser.fullname || currentUser.username} đã tag bạn trong một bình luận: "${content.slice(0, 50)}..."`,
                 });
-                await notification.save();
-                // console.log("Notification sent to tagged user:", taggedUserId);
             }
         }
 
-        // Gửi thông báo cho người tạo comment cha ở mọi cấp
-        for (const parentUserId of parentCommentIds) {
-            const notification = new notificationModel({
-                userId: parentUserId,
-                commentId: comment._id,
+        if (parent && parent.createdBy.toString() !== req.user.userId.toString()) {
+            notifications.push({
+                userId: parent.createdBy,
+                commentId: savedComment._id,
                 taggedBy: req.user.userId,
                 content: `${currentUser.fullname} đã trả lời bình luận của bạn: "${content.slice(0, 50)}..."`,
             });
-            await notification.save();
-            // console.log("Notification sent to parent comment owner:", parentUserId);
         }
 
-        // Gửi thông báo cho người tham gia chủ đề (sibling comments)
         if (parent) {
             const siblingComments = await commentModel
-                .find({ parentComment, _id: { $ne: comment._id } })
-                .populate("createdBy", "username fullname");
-            const notifiedUsers = new Set([req.user.userId.toString(), ...parentCommentIds]);
+                .find({ parentComment, _id: { $ne: savedComment._id } })
+                .select("createdBy")
+                .lean();
+            const notifiedUsers = new Set([req.user.userId.toString(), parent.createdBy.toString()]);
             for (const sibling of siblingComments) {
-                if (!notifiedUsers.has(sibling.createdBy._id.toString())) {
-                    const notification = new notificationModel({
-                        userId: sibling.createdBy._id,
-                        commentId: comment._id,
+                if (!notifiedUsers.has(sibling.createdBy.toString())) {
+                    notifications.push({
+                        userId: sibling.createdBy,
+                        commentId: savedComment._id,
                         taggedBy: req.user.userId,
                         content: `${currentUser.fullname} đã trả lời trong chủ đề bạn tham gia: "${content.slice(0, 50)}..."`,
                     });
-                    await notification.save();
-                    // console.log("Notification sent to sibling comment owner:", sibling.createdBy._id);
-                    notifiedUsers.add(sibling.createdBy._id.toString());
+                    notifiedUsers.add(sibling.createdBy.toString());
                 }
             }
         }
 
-        const populatedComment = await commentModel
-            .findById(comment._id)
-            .populate("createdBy", "username fullname role")
-            .populate("taggedUsers", "username fullname role");
+        if (notifications.length > 0) {
+            notificationModel.insertMany(notifications).catch(err => {
+                console.error("Error saving notifications:", err.message);
+            });
+        }
+
+        broadcastComment({
+            type: "NEW_COMMENT",
+            data: populatedComment,
+        });
+
         res.status(201).json(populatedComment);
     } catch (error) {
         console.error("Error in POST /comments:", error.message);
@@ -201,7 +168,7 @@ router.post("/", authenticate, async (req, res) => {
     }
 });
 
-router.post("/:id/like", authenticate, async (req, res) => {
+router.post("/:id/like", authenticate, likeLimiter, async (req, res) => {
     try {
         const comment = await commentModel.findById(req.params.id);
         if (!comment) {
@@ -211,19 +178,22 @@ router.post("/:id/like", authenticate, async (req, res) => {
         const userId = req.user.userId;
         const hasLiked = comment.likedBy.includes(userId);
 
-        if (!hasLiked) {
-            comment.likedBy.push(userId);
-            comment.likes += 1;
-        } else {
-            comment.likedBy = comment.likedBy.filter(id => id.toString() !== userId.toString());
-            comment.likes -= 1;
-        }
+        comment.likedBy = hasLiked
+            ? comment.likedBy.filter(id => id.toString() !== userId.toString())
+            : [...comment.likedBy, userId];
+        comment.likes = comment.likedBy.length;
 
         await comment.save();
         const populatedComment = await commentModel
             .findById(comment._id)
             .populate("createdBy", "username fullname role")
             .populate("taggedUsers", "username fullname role");
+
+        broadcastComment({
+            type: "LIKE_UPDATE",
+            data: populatedComment,
+        });
+
         res.status(200).json(populatedComment);
     } catch (error) {
         console.error("Error in /comments/:id/like:", error.message);
@@ -245,9 +215,18 @@ router.delete("/:id", authenticate, restrictToAdmin, async (req, res) => {
                 await child.deleteOne();
             }
         };
-        await deleteChildComments(comment._id);
-        await comment.deleteOne();
-        await notificationModel.deleteMany({ commentId: comment._id });
+
+        await Promise.all([
+            deleteChildComments(comment._id),
+            comment.deleteOne(),
+            notificationModel.deleteMany({ commentId: comment._id }),
+        ]);
+
+        broadcastComment({
+            type: "DELETE_COMMENT",
+            data: { _id: comment._id },
+        });
+
         res.status(200).json({ message: "Bình luận và các bình luận con đã được xóa" });
     } catch (error) {
         console.error("Error in /comments/:id DELETE:", error.message);

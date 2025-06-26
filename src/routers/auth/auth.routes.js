@@ -6,12 +6,43 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const userModel = require("../../models/users.models");
 const nodemailer = require("nodemailer");
+const rateLimit = require("express-rate-limit");
+
+// Rate limiting cho login
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 phút
+    max: 5, // Tối đa 5 yêu cầu mỗi IP
+    message: "Quá nhiều yêu cầu đăng nhập. Vui lòng thử lại sau 15 phút.",
+});
+
+// Rate limiting cho register
+const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 giờ
+    max: 3, // Tối đa 3 yêu cầu mỗi IP
+    message: "Quá nhiều yêu cầu đăng ký. Vui lòng thử lại sau 1 giờ.",
+});
+
+// Rate limiting cho forgot-password
+const forgotPasswordLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 giờ
+    max: 3, // Tối đa 3 yêu cầu mỗi IP
+    message: "Quá nhiều yêu cầu gửi link đặt lại mật khẩu. Vui lòng thử lại sau 1 giờ.",
+});
+
+// Rate limiting cho reset-password
+const resetPasswordLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 giờ
+    max: 5, // Tối đa 5 yêu cầu mỗi IP
+    message: "Quá nhiều yêu cầu đặt lại mật khẩu. Vui lòng thử lại sau 1 giờ.",
+});
 
 // Kiểm tra biến môi trường
 let transporter;
 if ("xsmb.win.contact@gmail.com" && "fgqc wehk ypfa ykkf") {
     transporter = nodemailer.createTransport({
         service: "gmail",
+        pool: true, // Sử dụng connection pool
+        maxConnections: 5,
         auth: {
             user: "xsmb.win.contact@gmail.com",
             pass: "fgqc wehk ypfa ykkf",
@@ -91,7 +122,7 @@ router.get("/", async (req, res) => {
 });
 
 // POST: Đăng ký người dùng
-router.post("/register", validateRegisterInput, async (req, res) => {
+router.post("/register", registerLimiter, validateRegisterInput, async (req, res) => {
     const { username, email, fullname, password } = req.body;
     const deviceInfo = req.headers["user-agent"] || "unknown";
 
@@ -102,25 +133,23 @@ router.post("/register", validateRegisterInput, async (req, res) => {
         }
 
         const user = new userModel({ username, email, fullname, password });
-        await user.save();
-
         const accessToken = jwt.sign(
             { userId: user._id, role: user.role },
             process.env.JWT_SECRET,
-            { expiresIn: "1h" }
+            { expiresIn: "12h" }
         );
 
         const refreshToken = jwt.sign(
             { userId: user._id },
             process.env.JWT_REFRESH_SECRET,
-            { expiresIn: "7d" }
+            { expiresIn: "30d" }
         );
 
-        user.refreshTokens.push({
+        user.refreshTokens = [{
             token: refreshToken,
             deviceInfo,
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        });
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        }];
         await user.save();
 
         res.status(201).json({
@@ -136,44 +165,53 @@ router.post("/register", validateRegisterInput, async (req, res) => {
 });
 
 // POST: Đăng nhập
-router.post("/login", validateRegisterInput, async (req, res) => {
+router.post("/login", loginLimiter, validateRegisterInput, async (req, res) => {
     const { username, password } = req.body;
     const deviceInfo = req.headers["user-agent"] || "unknown";
 
     try {
-        console.log("Login attempt for username:", username);
         const user = await userModel.findOne({ username });
         if (!user) {
-            console.log("User not found:", username);
             return res.status(400).json({ error: "Username not found" });
+        }
+
+        if (user.lockUntil && user.lockUntil > new Date()) {
+            return res.status(403).json({ error: "Tài khoản bị khóa. Vui lòng thử lại sau." });
         }
 
         const isMatch = await user.comparePassword(password);
         if (!isMatch) {
-            console.log("Password mismatch for username:", username);
+            user.failedLoginAttempts += 1;
+            if (user.failedLoginAttempts >= 5) {
+                user.lockUntil = new Date(Date.now() + 15 * 60 * 1000); // Khóa 15 phút
+                user.failedLoginAttempts = 0;
+            }
+            await user.save();
             return res.status(400).json({ error: "Incorrect password" });
         }
+
+        user.failedLoginAttempts = 0;
+        user.lockUntil = null;
 
         const accessToken = jwt.sign(
             { userId: user._id, role: user.role },
             process.env.JWT_SECRET,
-            { expiresIn: "1h" }
+            { expiresIn: "12h" }
         );
 
         const refreshToken = jwt.sign(
             { userId: user._id },
             process.env.JWT_REFRESH_SECRET,
-            { expiresIn: "7d" }
+            { expiresIn: "30d" }
         );
 
         user.refreshTokens.push({
             token: refreshToken,
             deviceInfo,
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         });
         await user.save();
 
-        console.log("Login successful for username:", username);
         res.status(200).json({
             accessToken,
             refreshToken,
@@ -186,7 +224,7 @@ router.post("/login", validateRegisterInput, async (req, res) => {
 });
 
 // POST: Quên mật khẩu
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
@@ -209,15 +247,14 @@ router.post("/forgot-password", async (req, res) => {
             { expiresIn: "1h" }
         );
 
-        const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+        const resetLink = `${process.env.FRONTEND_URL}/reset-password`;
         await transporter.sendMail({
             from: "xsmb.win.contact@gmail.com",
             to: email,
             subject: "Đặt lại mật khẩu",
-            html: `<p>Nhấn vào liên kết sau để đặt lại mật khẩu của bạn:</p><a href="${resetLink}">${resetLink}</a><p>Liên kết này có hiệu lực trong 1 giờ. Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>`,
+            html: `<p>Nhấn vào liên kết sau và nhập mã: ${resetToken}</p><a href="${resetLink}">Đặt lại mật khẩu</a><p>Mã có hiệu lực trong 1 giờ.</p>`,
         });
 
-        // console.log(`Password reset email sent to: ${email}`);
         res.status(200).json({ message: "Link đặt lại mật khẩu đã được gửi tới email của bạn" });
     } catch (error) {
         console.error("Error in /forgot-password:", error.message);
@@ -226,7 +263,7 @@ router.post("/forgot-password", async (req, res) => {
 });
 
 // POST: Đặt lại mật khẩu
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", resetPasswordLimiter, async (req, res) => {
     const { token, newPassword } = req.body;
 
     if (!token) {
@@ -241,18 +278,16 @@ router.post("/reset-password", async (req, res) => {
             return res.status(400).json({ error: "Invalid or expired token" });
         }
 
-        // Nếu không có newPassword, chỉ kiểm tra token
         if (!newPassword) {
             return res.status(200).json({ message: "Token is valid" });
         }
 
-        // Kiểm tra mật khẩu mới
         if (newPassword.length < 8) {
             return res.status(400).json({ error: "New password must be at least 8 characters long" });
         }
 
         user.password = newPassword;
-        user.refreshTokens = []; // Vô hiệu hóa tất cả refresh tokens cũ
+        user.refreshTokens = [];
         await user.save();
 
         res.status(200).json({ message: "Password reset successfully" });
@@ -294,22 +329,22 @@ router.post("/refresh-token", async (req, res) => {
         const newRefreshToken = jwt.sign(
             { userId: user._id },
             process.env.JWT_REFRESH_SECRET,
-            { expiresIn: "7d" }
+            { expiresIn: "30d" }
         );
         user.refreshTokens.push({
             token: newRefreshToken,
             deviceInfo,
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         });
 
         const accessToken = jwt.sign(
             { userId: user._id, role: user.role },
             process.env.JWT_SECRET,
-            { expiresIn: "1h" }
+            { expiresIn: "12h" }
         );
 
         await user.save();
-        res.status(200).json({ accessToken, refreshToken: newRefreshToken });
+        res.status(200).json({ accessToken, newRefreshToken });
     } catch (error) {
         console.error("Error in /refresh-token:", error.message);
         if (error.name === "TokenExpiredError") {
@@ -339,7 +374,6 @@ router.post("/logout", async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
-
 
 module.exports = {
     router,
