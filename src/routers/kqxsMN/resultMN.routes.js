@@ -472,7 +472,7 @@ router.get('/xsmn/sse', sseLimiter, async (req, res) => {
         const keepAlive = setInterval(() => {
             res.write(': keep-alive\n\n');
             res.flush();
-        }, 15000);
+        }, 5000);
 
         req.on('close', async () => {
             clearInterval(keepAlive);
