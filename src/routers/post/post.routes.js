@@ -10,9 +10,9 @@ const multer = require("multer");
 
 // Cấu hình Cloudinary
 cloudinary.config({
-    cloud_name: "db15lvbrw",
-    api_key: "685414381137448",
-    api_secret: "6CNRrgEZQNt4GFggzkt0G5A8ePY",
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 console.log('Cloudinary Config:', {
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

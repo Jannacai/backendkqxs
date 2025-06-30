@@ -1,60 +1,72 @@
-const WebSocket = require("ws");
+const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 
-let wss = null;
+let io = null;
 
 function initializeWebSocket(server) {
-    if (wss) {
+    if (io) {
         return;
     }
-    wss = new WebSocket.Server({ server });
+    io = new Server(server, {
+        cors: {
+            origin: process.env.FRONTEND_URL || "http://localhost:3000",
+            methods: ["GET", "POST"],
+            credentials: true,
+        },
+    });
 
-    wss.on("connection", (ws, req) => {
-        const token = new URLSearchParams(req.url.slice(1)).get("token");
+    io.on("connection", (socket) => {
+        const token = socket.handshake.query.token;
         if (!token) {
-            ws.close(1008, "Token required");
+            socket.disconnect(true);
             return;
         }
 
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            ws.userId = decoded.userId;
-            console.log(`WebSocket client connected: ${ws.userId}`);
+            socket.userId = decoded.userId;
+            console.log(`Socket.IO client connected: ${socket.userId}`);
+
+            // Cho phép client join room chung cho bình luận (nếu không liên quan đến bài viết)
+            socket.on("joinChat", () => {
+                socket.join("chat");
+                console.log(`Client ${socket.userId} joined chat room`);
+            });
+
+            // Cho phép client join room cho bài viết cụ thể
+            socket.on("joinPost", (postId) => {
+                socket.join(`post:${postId}`);
+                console.log(`Client ${socket.userId} joined room post:${postId}`);
+            });
         } catch (err) {
-            ws.close(1008, "Invalid token");
+            console.error("Token verification error:", err.message);
+            socket.disconnect(true);
             return;
         }
 
-        ws.on("close", () => {
-            console.log(`WebSocket client disconnected: ${ws.userId}`);
+        socket.on("disconnect", () => {
+            console.log(`Socket.IO client disconnected: ${socket.userId}`);
         });
 
-        ws.on("error", (error) => {
-            console.error(`WebSocket error for client ${ws.userId}:`, error.message);
+        socket.on("error", (error) => {
+            console.error(`Socket.IO error for client ${socket.userId}:`, error.message);
         });
     });
 
-    console.log("WebSocket server initialized");
+    console.log("Socket.IO server initialized");
 }
 
 function broadcastComment(message) {
-    if (!wss) {
-        console.warn("WebSocket server not initialized, skipping broadcast");
+    if (!io) {
+        console.warn("Socket.IO server not initialized, skipping broadcast");
         return;
     }
-    const payload = JSON.stringify({
-        type: message.type,
-        data: message.data,
-    });
-    wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-            try {
-                client.send(payload);
-            } catch (err) {
-                console.error(`Error sending to client ${client.userId}:`, err.message);
-            }
-        }
-    });
+    // Gửi đến room cụ thể nếu có postId, nếu không thì gửi đến room "chat" hoặc tất cả client
+    if (message.postId) {
+        io.to(`post:${message.postId}`).emit(message.type, message.data);
+    } else {
+        io.to("chat").emit(message.type, message.data); // Gửi đến room "chat" cho bình luận chung
+    }
 }
 
 module.exports = { initializeWebSocket, broadcastComment };
