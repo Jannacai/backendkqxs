@@ -5,9 +5,20 @@ const Post = require("../../models/posts.models");
 const { VALID_CATEGORIES } = require("../../models/posts.models");
 const redis = require("redis");
 const rateLimit = require("express-rate-limit");
-const { google } = require('googleapis');
-const stream = require('stream');
-const multer = require('multer');
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
+
+// Cấu hình Cloudinary
+cloudinary.config({
+    cloud_name: "db15lvbrw",
+    api_key: "685414381137448",
+    api_secret: "6CNRrgEZQNt4GFggzkt0G5A8ePY",
+});
+console.log('Cloudinary Config:', {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY ? 'Set' : 'Not set',
+    api_secret: process.env.CLOUDINARY_API_SECRET ? 'Set' : 'Not set',
+});
 
 // Cấu hình Multer để xử lý file upload
 const storage = multer.memoryStorage();
@@ -58,54 +69,47 @@ const restrictToAdmin = (req, res, next) => {
     next();
 };
 
-// Endpoint để tải file lên Google Drive
-router.post('/upload-to-drive', authenticate, restrictToAdmin, upload.single('file'), async (req, res) => {
+// Endpoint để tải file lên Cloudinary
+router.post('/upload-to-cloudinary', authenticate, restrictToAdmin, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const credentialsRaw = process.env.GOOGLE_CREDENTIALS_JSON;
-        // console.log('Raw GOOGLE_CREDENTIALS_JSON:', credentialsRaw.substring(0, 200) + '...');
-
-        const credentials = JSON.parse(credentialsRaw);
-        // console.log('Parsed credentials:', credentials);
-
-        const auth = new google.auth.GoogleAuth({
-            credentials: credentials,
-            scopes: ['https://www.googleapis.com/auth/drive.file'],
-        });
-        const drive = google.drive({ version: 'v3', auth });
-
-        const fileMetadata = {
-            name: `${Date.now()}_${req.file.originalname}`,
-            parents: ['1_vIBh_U62kLvPbvq7lKEwlv_VpRtxbQt'],
-        };
-        const media = {
-            mimeType: req.file.mimetype,
-            body: stream.PassThrough().end(req.file.buffer),
-        };
-
-        const response = await drive.files.create({
-            resource: fileMetadata,
-            media,
-            fields: 'id',
+        console.log('Uploading file to Cloudinary:', {
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
         });
 
-        await drive.permissions.create({
-            fileId: response.data.id,
-            requestBody: {
-                role: 'reader',
-                type: 'anyone',
-            },
+        const bufferStream = require('stream').PassThrough();
+        bufferStream.end(req.file.buffer);
+
+        const result = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    folder: 'posts',
+                    public_id: `${Date.now()}_${req.file.originalname.split('.')[0]}`,
+                    resource_type: 'image',
+                    transformation: [{ width: 1200, quality: 'auto', fetch_format: 'auto' }],
+                },
+                (error, result) => {
+                    if (error) reject(error);
+                    else resolve(result);
+                }
+            );
+            bufferStream.pipe(uploadStream);
         });
 
-        const publicUrl = `https://drive.google.com/thumbnail?id=${response.data.id}&sz=w1000`;
+        console.log('Cloudinary upload result:', {
+            secure_url: result.secure_url,
+            public_id: result.public_id,
+        });
 
-        res.status(200).json({ url: publicUrl });
+        res.status(200).json({ url: result.secure_url });
     } catch (error) {
-        console.error('Error uploading to Google Drive:', error);
-        res.status(500).json({ error: 'Failed to upload to Google Drive', details: error.stack });
+        console.error('Error uploading to Cloudinary:', error);
+        res.status(500).json({ error: 'Failed to upload to Cloudinary', details: error.message });
     }
 });
 
@@ -142,12 +146,6 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         }
     }
 
-    if (contentOrder) {
-        if (!Array.isArray(contentOrder) || !contentOrder.every(item => item.type === "mainContent")) {
-            return res.status(400).json({ error: "Invalid contentOrder" });
-        }
-    }
-
     try {
         const post = new Post({
             title,
@@ -158,23 +156,11 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         });
         await post.save();
 
+        const cacheKeysToClear = new Set([`post:${post._id}`]);
         for (const cat of category || ["Tin hot"]) {
-            const cacheKey = `posts:recent:page:1:limit:15:category:${cat || 'all'}`;
-            const cached = await redisClient.get(cacheKey);
-            if (cached) {
-                let cachedData = JSON.parse(cached);
-                cachedData.posts = [post.toJSON(), ...cachedData.posts.filter(p => p._id.toString() !== post._id.toString()).slice(0, 14)];
-                await redisClient.setEx(cacheKey, 300, JSON.stringify(cachedData));
-            }
+            cacheKeysToClear.add(`posts:recent:page:1:limit:15:category:${cat || 'all'}`);
         }
-
-        const cachedKeys = await redisClient.sMembers("cachedPostKeys");
-        if (cachedKeys.length > 0) {
-            await redisClient.del(cachedKeys);
-            await redisClient.del("cachedPostKeys");
-            // console.log("Cleared cache keys:", cachedKeys);
-        }
-        await redisClient.del(`post:${post._id}`);
+        await redisClient.del([...cacheKeysToClear]);
 
         res.status(201).json(post);
     } catch (error) {
