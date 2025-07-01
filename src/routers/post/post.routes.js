@@ -10,9 +10,9 @@ const multer = require("multer");
 
 // Cấu hình Cloudinary
 cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
+    cloud_name: "db15lvbrw",
+    api_key: "685414381137448",
+    api_secret: "6CNRrgEZQNt4GFggzkt0G5A8ePY",
 });
 console.log('Cloudinary Config:', {
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -69,49 +69,7 @@ const restrictToAdmin = (req, res, next) => {
     next();
 };
 
-// Endpoint để tải file lên Cloudinary
-router.post('/upload-to-cloudinary', authenticate, restrictToAdmin, upload.single('file'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
 
-        console.log('Uploading file to Cloudinary:', {
-            originalname: req.file.originalname,
-            mimetype: req.file.mimetype,
-            size: req.file.size,
-        });
-
-        const bufferStream = require('stream').PassThrough();
-        bufferStream.end(req.file.buffer);
-
-        const result = await new Promise((resolve, reject) => {
-            const uploadStream = cloudinary.uploader.upload_stream(
-                {
-                    folder: 'posts',
-                    public_id: `${Date.now()}_${req.file.originalname.split('.')[0]}`,
-                    resource_type: 'image',
-                    transformation: [{ width: 1200, quality: 'auto', fetch_format: 'auto' }],
-                },
-                (error, result) => {
-                    if (error) reject(error);
-                    else resolve(result);
-                }
-            );
-            bufferStream.pipe(uploadStream);
-        });
-
-        console.log('Cloudinary upload result:', {
-            secure_url: result.secure_url,
-            public_id: result.public_id,
-        });
-
-        res.status(200).json({ url: result.secure_url });
-    } catch (error) {
-        console.error('Error uploading to Cloudinary:', error);
-        res.status(500).json({ error: 'Failed to upload to Cloudinary', details: error.message });
-    }
-});
 
 router.post("/", authenticate, restrictToAdmin, async (req, res) => {
     const { title, mainContents, category, contentOrder } = req.body;
@@ -171,7 +129,49 @@ router.post("/", authenticate, restrictToAdmin, async (req, res) => {
         return res.status(500).json({ error: "Failed to save post", details: error.message });
     }
 });
+// Endpoint để tải file lên Cloudinary
+router.post('/upload-to-cloudinary', authenticate, restrictToAdmin, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
 
+        console.log('Uploading file to Cloudinary:', {
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+        });
+
+        const bufferStream = require('stream').PassThrough();
+        bufferStream.end(req.file.buffer);
+
+        const result = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    folder: 'posts',
+                    public_id: `${Date.now()}_${req.file.originalname.split('.')[0]}`,
+                    resource_type: 'image',
+                    transformation: [{ width: 1200, quality: 'auto', fetch_format: 'auto' }],
+                },
+                (error, result) => {
+                    if (error) reject(error);
+                    else resolve(result);
+                }
+            );
+            bufferStream.pipe(uploadStream);
+        });
+
+        console.log('Cloudinary upload result:', {
+            secure_url: result.secure_url,
+            public_id: result.public_id,
+        });
+
+        res.status(200).json({ url: result.secure_url });
+    } catch (error) {
+        console.error('Error uploading to Cloudinary:', error);
+        res.status(500).json({ error: 'Failed to upload to Cloudinary', details: error.message });
+    }
+});
 router.get("/categories", apiLimiter, async (req, res) => {
     try {
         res.status(200).json({ categories: VALID_CATEGORIES });

@@ -38,14 +38,14 @@ const resetPasswordLimiter = rateLimit({
 
 // Kiểm tra biến môi trường
 let transporter;
-if ("xsmb.win.contact@gmail.com" && "fgqc wehk ypfa ykkf") {
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     transporter = nodemailer.createTransport({
         service: "gmail",
         pool: true, // Sử dụng connection pool
         maxConnections: 5,
         auth: {
-            user: "xsmb.win.contact@gmail.com",
-            pass: "fgqc wehk ypfa ykkf",
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
         },
     });
 
@@ -89,9 +89,18 @@ const authenticate = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
+        console.log('Decoded JWT:', decoded); // Debug token
+        if (!decoded.userId && !decoded._id) {
+            return res.status(401).json({ error: "Token không chứa ID người dùng" });
+        }
+        req.user = {
+            id: decoded.userId || decoded._id,
+            userId: decoded.userId || decoded._id,
+            role: decoded.role,
+        };
         next();
     } catch (error) {
+        console.error('Authentication error:', error.message);
         return res.status(401).json({ error: "Invalid token" });
     }
 };
@@ -99,7 +108,7 @@ const authenticate = (req, res, next) => {
 // GET: Lấy thông tin người dùng
 router.get("/me", authenticate, async (req, res) => {
     try {
-        const user = await userModel.findById(req.user.userId).select("-password -refreshTokens");
+        const user = await userModel.findById(req.user.id).select("-password -refreshTokens");
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
@@ -249,7 +258,7 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
 
         const resetLink = `${process.env.FRONTEND_URL}/reset-password`;
         await transporter.sendMail({
-            from: "xsmb.win.contact@gmail.com",
+            from: process.env.EMAIL_USER,
             to: email,
             subject: "Đặt lại mật khẩu",
             html: `<p>Nhấn vào liên kết sau và nhập mã: ${resetToken}</p><a href="${resetLink}">Đặt lại mật khẩu</a><p>Mã có hiệu lực trong 1 giờ.</p>`,

@@ -1,3 +1,5 @@
+"use strict";
+
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 
@@ -18,6 +20,7 @@ function initializeWebSocket(server) {
     io.on("connection", (socket) => {
         const token = socket.handshake.query.token;
         if (!token) {
+            console.log('No token provided, disconnecting client:', socket.id);
             socket.disconnect(true);
             return;
         }
@@ -27,16 +30,19 @@ function initializeWebSocket(server) {
             socket.userId = decoded.userId;
             console.log(`Socket.IO client connected: ${socket.userId}`);
 
-            // Cho phép client join room chung cho bình luận (nếu không liên quan đến bài viết)
             socket.on("joinChat", () => {
                 socket.join("chat");
                 console.log(`Client ${socket.userId} joined chat room`);
             });
 
-            // Cho phép client join room cho bài viết cụ thể
             socket.on("joinPost", (postId) => {
                 socket.join(`post:${postId}`);
                 console.log(`Client ${socket.userId} joined room post:${postId}`);
+            });
+
+            socket.on("joinLotteryFeed", () => {
+                socket.join("lotteryFeed");
+                console.log(`Client ${socket.userId} joined lotteryFeed room`);
             });
         } catch (err) {
             console.error("Token verification error:", err.message);
@@ -56,17 +62,21 @@ function initializeWebSocket(server) {
     console.log("Socket.IO server initialized");
 }
 
-function broadcastComment(message) {
+function broadcastComment({ type, data, room, postId }) {
     if (!io) {
         console.warn("Socket.IO server not initialized, skipping broadcast");
         return;
     }
-    // Gửi đến room cụ thể nếu có postId, nếu không thì gửi đến room "chat" hoặc tất cả client
-    if (message.postId) {
-        io.to(`post:${message.postId}`).emit(message.type, message.data);
+    if (room) {
+        io.to(room).emit(type, data);
+        console.log(`Broadcasted ${type} to room ${room}`);
+    } else if (postId) {
+        io.to(`post:${postId}`).emit(type, data);
+        console.log(`Broadcasted ${type} to room post:${postId}`);
     } else {
-        io.to("chat").emit(message.type, message.data); // Gửi đến room "chat" cho bình luận chung
+        io.to("chat").emit(type, data);
+        console.log(`Broadcasted ${type} to chat room`);
     }
 }
 
-module.exports = { initializeWebSocket, broadcastComment };
+module.exports = { initializeWebSocket, broadcastComment, io };

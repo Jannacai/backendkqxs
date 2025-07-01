@@ -3,6 +3,8 @@ const { router: authK } = require('./auth/auth.routes');
 const commentRoutes = require('./auth/comment.routes');
 const notificationRoutes = require('./auth/notification.routes');
 const userRoutes = require('./auth/user.routes');
+const lotteryRoutes = require('./lottery/lottery');
+
 const resultsRouterMB = require('./kqxsMB/resultMB.routes');
 const resultsRouterMN = require('./kqxsMN/resultMN.routes');
 const resultsRouterMT = require('./kqxsMT/resultMT.routes');
@@ -16,6 +18,7 @@ const Routes = (app) => {
     app.use('/api/notifications', notificationRoutes);
     app.use('/api/comments', commentRoutes);
     app.use('/api/auth', authK);
+    app.use('/api/lottery', lotteryRoutes);
     app.use('/api/ketqua', resultsRouterMN);
     app.use('/api/ketquaxs', resultsRouterMT);
     app.use('/api/kqxs', resultsRouterMB);
