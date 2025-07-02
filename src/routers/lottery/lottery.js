@@ -34,10 +34,13 @@ router.get('/check-limit', authenticate, async (req, res) => {
         if (!userId || !startDate || !endDate) {
             return res.status(400).json({ message: 'Thiếu userId, startDate hoặc endDate' });
         }
+        console.log('Check-limit query:', { userId, startDate, endDate });
         const registrations = await LotteryRegistration.find({
             userId: new mongoose.Types.ObjectId(userId),
             createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
         });
+        console.log('Check-limit response:', registrations);
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.status(200).json({ registrations });
     } catch (err) {
         console.error('Error in /lottery/check-limit:', err.message);
@@ -64,6 +67,7 @@ router.get('/registrations', async (req, res) => {
             .limit(Number(limit))
             .lean();
         const total = await LotteryRegistration.countDocuments(query);
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.status(200).json({ registrations, total, page, limit });
     } catch (err) {
         console.error('Error in /lottery/registrations:', err.message);
@@ -110,6 +114,12 @@ router.post('/register', authenticate, async (req, res) => {
             numbers
         });
         await registration.save();
+        console.log('Saved registration:', {
+            id: registration._id,
+            userId: registration.userId,
+            createdAt: registration.createdAt,
+            region
+        });
         const populatedRegistration = await LotteryRegistration.findById(registration._id)
             .populate('userId', 'username fullname level points titles telegramId')
             .lean();
@@ -131,6 +141,7 @@ router.post('/register', authenticate, async (req, res) => {
             room: 'lotteryFeed'
         });
 
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.status(200).json({
             message: 'Đăng ký thành công',
             registration: {
@@ -208,6 +219,7 @@ router.put('/update/:registrationId', authenticate, async (req, res) => {
             room: 'lotteryFeed'
         });
 
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.status(200).json({
             message: 'Chỉnh sửa đăng ký thành công',
             registration: {
@@ -225,13 +237,18 @@ router.put('/update/:registrationId', authenticate, async (req, res) => {
     }
 });
 
-// Endpoint lấy kết quả đối chiếu của người dùng
 router.get('/check-results', authenticate, async (req, res) => {
     try {
         const { date } = req.query;
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? moment.tz(date, 'DD-MM-YYYY', 'Asia/Ho_Chi_Minh').startOf('day').toDate()
             : moment().tz('Asia/Ho_Chi_Minh').startOf('day').toDate();
+
+        console.log('Check-results query:', {
+            userId: req.user.userId,
+            targetDate,
+            endDate: moment(targetDate).endOf('day').toDate()
+        });
 
         const registrations = await LotteryRegistration.find({
             userId: new mongoose.Types.ObjectId(req.user.userId),
@@ -241,6 +258,8 @@ router.get('/check-results', authenticate, async (req, res) => {
             }
         }).populate('userId', 'username telegramId');
 
+        console.log('Check-results response:', registrations);
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.status(200).json({ registrations });
     } catch (err) {
         console.error('Error in /lottery/check-results:', err.message);
@@ -248,7 +267,6 @@ router.get('/check-results', authenticate, async (req, res) => {
     }
 });
 
-// Cron job đối chiếu kết quả sau 18:32
 cron.schedule('32 18 * * *', async () => {
     console.log('Bắt đầu đối chiếu kết quả XSMB...');
     try {
@@ -263,7 +281,6 @@ cron.schedule('32 18 * * *', async () => {
             return;
         }
 
-        // Lấy tất cả các giải
         const allPrizes = [
             ...(xsmbResult.specialPrize || []),
             ...(xsmbResult.firstPrize || []),
@@ -275,7 +292,6 @@ cron.schedule('32 18 * * *', async () => {
             ...(xsmbResult.sevenPrizes || [])
         ].filter(prize => prize && prize !== '...');
 
-        // Lấy tất cả đăng ký hôm nay cho miền Bắc
         const registrations = await LotteryRegistration.find({
             region: 'Bac',
             createdAt: { $gte: today, $lte: moment(today).endOf('day').toDate() }
@@ -293,7 +309,6 @@ cron.schedule('32 18 * * *', async () => {
             };
             const matchedPrizes = [];
 
-            // Kiểm tra bạch thủ lô (2 số cuối)
             if (registration.numbers.bachThuLo) {
                 const lastTwoDigits = allPrizes.map(prize => prize.slice(-2));
                 if (lastTwoDigits.includes(registration.numbers.bachThuLo)) {
@@ -303,7 +318,6 @@ cron.schedule('32 18 * * *', async () => {
                 }
             }
 
-            // Kiểm tra song thủ lô (2 số, mỗi số 2 chữ số)
             if (registration.numbers.songThuLo.length > 0) {
                 const lastTwoDigits = allPrizes.map(prize => prize.slice(-2));
                 registration.numbers.songThuLo.forEach(num => {
@@ -315,7 +329,6 @@ cron.schedule('32 18 * * *', async () => {
                 });
             }
 
-            // Kiểm tra 3CL (3 số cuối)
             if (registration.numbers.threeCL) {
                 const lastThreeDigits = allPrizes.map(prize => prize.slice(-3));
                 if (lastThreeDigits.includes(registration.numbers.threeCL)) {
@@ -325,7 +338,6 @@ cron.schedule('32 18 * * *', async () => {
                 }
             }
 
-            // Kiểm tra chạm (2 số cuối của giải đặc biệt chứa số chạm)
             if (registration.numbers.cham && xsmbResult.specialPrize && xsmbResult.specialPrize[0]) {
                 const specialLastTwo = xsmbResult.specialPrize[0].slice(-2);
                 if (specialLastTwo.includes(registration.numbers.cham)) {
@@ -335,7 +347,6 @@ cron.schedule('32 18 * * *', async () => {
                 }
             }
 
-            // Cập nhật kết quả
             registration.result = {
                 isChecked: true,
                 isWin,
@@ -345,7 +356,6 @@ cron.schedule('32 18 * * *', async () => {
             };
             await registration.save();
 
-            // Gửi thông báo qua Telegram
             const user = registration.userId;
             if (user.telegramId) {
                 const message = isWin

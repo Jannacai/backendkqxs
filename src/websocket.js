@@ -17,47 +17,41 @@ function initializeWebSocket(server) {
         },
     });
 
-    io.use((socket, next) => {
-        const token = socket.handshake.query.token || socket.handshake.auth.token;
-        console.log('Socket.IO token:', token); // Debug
+    io.on("connection", (socket) => {
+        const token = socket.handshake.query.token;
         if (!token) {
             console.log('No token provided, disconnecting client:', socket.id);
             socket.disconnect(true);
-            return next(new Error('Authentication error: Token missing'));
+            return;
         }
 
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            socket.userId = decoded.userId || decoded._id;
+            socket.userId = decoded.userId;
             console.log(`Socket.IO client connected: ${socket.userId}`);
-            next();
+
+            socket.on("joinChat", () => {
+                socket.join("chat");
+                console.log(`Client ${socket.userId} joined chat room`);
+            });
+
+            socket.on("joinPost", (postId) => {
+                socket.join(`post:${postId}`);
+                console.log(`Client ${socket.userId} joined room post:${postId}`);
+            });
+
+            socket.on("joinLotteryFeed", () => {
+                socket.join("lotteryFeed");
+                console.log(`Client ${socket.userId} joined lotteryFeed room`);
+            });
         } catch (err) {
-            console.error('Token verification error:', err.message);
+            console.error("Token verification error:", err.message);
             socket.disconnect(true);
-            return next(new Error('Authentication error: Invalid token'));
+            return;
         }
-    });
 
-    io.on("connection", (socket) => {
-        console.log(`Socket.IO client connected: ${socket.userId}`);
-
-        socket.on("joinChat", () => {
-            socket.join("chat");
-            console.log(`Client ${socket.userId} joined chat room`);
-        });
-
-        socket.on("joinPost", (postId) => {
-            socket.join(`post:${postId}`);
-            console.log(`Client ${socket.userId} joined room post:${postId}`);
-        });
-
-        socket.on("joinLotteryFeed", () => {
-            socket.join("lotteryFeed");
-            console.log(`Client ${socket.userId} joined lotteryFeed room`);
-        });
-
-        socket.on("disconnect", (reason) => {
-            console.log(`Socket.IO client disconnected: ${socket.userId}, reason: ${reason}`);
+        socket.on("disconnect", () => {
+            console.log(`Socket.IO client disconnected: ${socket.userId}`);
         });
 
         socket.on("error", (error) => {
@@ -75,13 +69,13 @@ function broadcastComment({ type, data, room, postId }) {
     }
     if (room) {
         io.to(room).emit(type, data);
-        console.log(`Broadcasted ${type} to room ${room}:`, data);
+        console.log(`Broadcasted ${type} to room ${room}`);
     } else if (postId) {
         io.to(`post:${postId}`).emit(type, data);
-        console.log(`Broadcasted ${type} to room post:${postId}:`, data);
+        console.log(`Broadcasted ${type} to room post:${postId}`);
     } else {
         io.to("chat").emit(type, data);
-        console.log(`Broadcasted ${type} to chat room:`, data);
+        console.log(`Broadcasted ${type} to chat room`);
     }
 }
 

@@ -17,7 +17,7 @@ const app = express();
 const server = http.createServer(app);
 
 app.set("trust proxy", 1);
-
+process.env.TZ = 'Asia/Ho_Chi_Minh';
 // Tạo thư mục uploads nếu chưa tồn tại
 const uploadsDir = path.join(__dirname, "Uploads");
 if (!fs.existsSync(uploadsDir)) {
