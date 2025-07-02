@@ -7,14 +7,15 @@ const { authenticate } = require("./auth.routes");
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const path = require('path');
+const { broadcastComment } = require('../../websocket.js');
 
 cloudinary.config({
-    cloud_name: "db15lvbrw",
-    api_key: "685414381137448",
-    api_secret: "6CNRrgEZQNt4GFggzkt0G5A8ePY",
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "db15lvbrw",
+    api_key: process.env.CLOUDINARY_API_KEY || "685414381137448",
+    api_secret: process.env.CLOUDINARY_API_SECRET || "6CNRrgEZQNt4GFggzkt0G5A8ePY",
 });
 console.log('Cloudinary Config:', {
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'Set' : 'Not set',
     api_key: process.env.CLOUDINARY_API_KEY ? 'Set' : 'Not set',
     api_secret: process.env.CLOUDINARY_API_SECRET ? 'Set' : 'Not set',
 });
@@ -41,23 +42,24 @@ const isAdmin = (req, res, next) => {
     next();
 };
 
-// Thêm endpoint /leaderboard
-router.get("/leaderboard", authenticate, async (req, res) => {
+router.get("/leaderboard", async (req, res) => {
     try {
-        const { limit = 50 } = req.query;
+        console.log('Fetching leaderboard with params:', req.query);
+        const { limit = 50, sortBy = 'points' } = req.query;
+        const sortOption = sortBy === 'winCount' ? { winCount: -1 } : { points: -1 };
         const users = await userModel
             .find()
-            .select("fullname img points level titles")
-            .sort({ points: -1 })
+            .select("fullname img points level titles winCount")
+            .sort(sortOption)
             .limit(parseInt(limit));
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.status(200).json({ users });
     } catch (error) {
         console.error("Error in /users/leaderboard:", error.message);
-        res.status(500).json({ error: "Internal Server Error", details: error.message });
+        res.status(500).json({ error: "Không thể tải bảng xếp hạng", details: error.message });
     }
 });
 
-// Các route hiện có
 router.get("/stats", authenticate, isAdmin, async (req, res) => {
     try {
         const stats = {
@@ -86,11 +88,9 @@ router.get("/stats", authenticate, isAdmin, async (req, res) => {
         res.status(200).json(stats);
     } catch (error) {
         console.error("Error in /users/stats:", error.message);
-        res.status(500).json({ error: "Internal Server Error", details: error.message });
+        res.status(500).json({ error: "Không thể tải thống kê", details: error.message });
     }
 });
-
-// ... (Các route còn lại giữ nguyên)
 
 router.get("/filter", authenticate, isAdmin, async (req, res) => {
     try {
@@ -113,7 +113,7 @@ router.get("/filter", authenticate, isAdmin, async (req, res) => {
         res.status(200).json(users);
     } catch (error) {
         console.error("Error in /users/filter:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Không thể lọc người dùng" });
     }
 });
 
@@ -132,7 +132,7 @@ router.get("/search", authenticate, async (req, res) => {
         res.status(200).json(users);
     } catch (error) {
         console.error("Error in /users/search:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Không thể tìm kiếm người dùng" });
     }
 });
 
@@ -142,7 +142,7 @@ router.get("/", authenticate, isAdmin, async (req, res) => {
         res.status(200).json(users);
     } catch (error) {
         console.error("Error in /users:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Không thể tải danh sách người dùng" });
     }
 });
 
@@ -156,7 +156,7 @@ router.get("/:id", authenticate, isAdmin, async (req, res) => {
         res.status(200).json(user);
     } catch (error) {
         console.error("Error in /users/:id:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Không thể lấy thông tin người dùng" });
     }
 });
 
@@ -175,10 +175,20 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
         if (level) user.level = level;
         if (points !== undefined) user.points = points;
         const updatedUser = await user.save();
+        broadcastComment({
+            type: 'USER_UPDATED',
+            data: {
+                _id: updatedUser._id,
+                points: updatedUser.points,
+                titles: updatedUser.titles,
+                winCount: updatedUser.winCount
+            },
+            room: 'leaderboard'
+        });
         res.status(200).json({ message: "Cập nhật thông tin người dùng thành công", user: updatedUser });
     } catch (error) {
         console.error("Error in /users/:id:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Không thể cập nhật người dùng" });
     }
 });
 
@@ -192,7 +202,7 @@ router.delete("/:id", authenticate, isAdmin, async (req, res) => {
         res.status(200).json({ message: "Xóa người dùng thành công" });
     } catch (error) {
         console.error("Error in /users/:id:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Không thể xóa người dùng" });
     }
 });
 
@@ -239,10 +249,21 @@ router.post("/upload-avatar", authenticate, upload.single('avatar'), async (req,
         if (!user) {
             return res.status(404).json({ error: "Người dùng không tồn tại" });
         }
+        broadcastComment({
+            type: 'USER_UPDATED',
+            data: {
+                _id: user._id,
+                points: user.points,
+                titles: user.titles,
+                winCount: user.winCount,
+                img: user.img
+            },
+            room: 'leaderboard'
+        });
         res.status(200).json({ message: "Tải ảnh đại diện thành công", user });
     } catch (error) {
         console.error("Error uploading avatar to Cloudinary:", error.message);
-        res.status(500).json({ error: "Failed to upload avatar", details: error.message });
+        res.status(500).json({ error: "Không thể tải ảnh đại diện", details: error.message });
     }
 });
 

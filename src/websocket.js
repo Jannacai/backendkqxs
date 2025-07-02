@@ -7,6 +7,7 @@ let io = null;
 
 function initializeWebSocket(server) {
     if (io) {
+        console.warn("Socket.IO server already initialized");
         return;
     }
     io = new Server(server, {
@@ -17,38 +18,44 @@ function initializeWebSocket(server) {
         },
     });
 
-    io.on("connection", (socket) => {
+    io.use((socket, next) => {
         const token = socket.handshake.query.token;
-        if (!token) {
-            console.log('No token provided, disconnecting client:', socket.id);
-            socket.disconnect(true);
-            return;
+        if (!token || token === "undefined" || token === "") {
+            console.error(`Socket.IO: No valid token provided for client ${socket.id}`);
+            return next(new Error("Authentication error: Missing or invalid token"));
         }
 
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             socket.userId = decoded.userId;
-            console.log(`Socket.IO client connected: ${socket.userId}`);
-
-            socket.on("joinChat", () => {
-                socket.join("chat");
-                console.log(`Client ${socket.userId} joined chat room`);
-            });
-
-            socket.on("joinPost", (postId) => {
-                socket.join(`post:${postId}`);
-                console.log(`Client ${socket.userId} joined room post:${postId}`);
-            });
-
-            socket.on("joinLotteryFeed", () => {
-                socket.join("lotteryFeed");
-                console.log(`Client ${socket.userId} joined lotteryFeed room`);
-            });
+            console.log(`Socket.IO client connected: ${socket.userId} (Client ID: ${socket.id})`);
+            next();
         } catch (err) {
-            console.error("Token verification error:", err.message);
-            socket.disconnect(true);
-            return;
+            console.error(`Socket.IO: Token verification failed for client ${socket.id}:`, err.message);
+            return next(new Error(`Authentication error: ${err.message}`));
         }
+    });
+
+    io.on("connection", (socket) => {
+        socket.on("joinChat", () => {
+            socket.join("chat");
+            console.log(`Client ${socket.userId} joined chat room`);
+        });
+
+        socket.on("joinPost", (postId) => {
+            socket.join(`post:${postId}`);
+            console.log(`Client ${socket.userId} joined room post:${postId}`);
+        });
+
+        socket.on("joinLotteryFeed", () => {
+            socket.join("lotteryFeed");
+            console.log(`Client ${socket.userId} joined lotteryFeed room`);
+        });
+
+        socket.on("joinLeaderboard", () => {
+            socket.join("leaderboard");
+            console.log(`Client ${socket.userId} joined leaderboard room`);
+        });
 
         socket.on("disconnect", () => {
             console.log(`Socket.IO client disconnected: ${socket.userId}`);

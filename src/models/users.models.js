@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const moment = require('moment-timezone');
 
 // Mảng ánh xạ số điểm với danh hiệu
 const TITLE_THRESHOLDS = [
@@ -37,11 +38,19 @@ const userSchema = new mongoose.Schema({
     titles: [{ type: String, enum: TITLES, default: 'Tân thủ' }],
     points: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
+    winCount: { type: Number, default: 0 }, // Thêm trường winCount
     role: { type: String, enum: ['USER', 'ADMIN'], default: 'USER' },
     refreshTokens: [refreshTokenSchema],
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
-    createdAt: { type: Date, default: Date.now },
+    createdAt: {
+        type: Date,
+        default: () => moment.tz('Asia/Ho_Chi_Minh').toDate()
+    },
+}, {
+    timestamps: {
+        currentTime: () => moment.tz('Asia/Ho_Chi_Minh').toDate()
+    }
 });
 
 // Middleware để hash mật khẩu
