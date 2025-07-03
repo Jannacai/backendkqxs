@@ -10,6 +10,7 @@ const LotteryRegistration = require('../../models/lottery.models');
 const XSMB = require('../../models/XS_MB.models');
 const XSMN = require('../../models/XS_MN.models');
 const XSMT = require('../../models/XS_MT.models');
+const Event = require('../../models/event.models');
 const { broadcastComment } = require('../../websocket.js');
 const cron = require('node-cron');
 const TelegramBot = require('node-telegram-bot-api');
@@ -36,7 +37,7 @@ const checkLotteryResults = async (region, Model) => {
     try {
         const today = moment().tz('Asia/Ho_Chi_Minh').startOf('day').toDate();
         const todayEnd = moment().tz('Asia/Ho_Chi_Minh').endOf('day').toDate();
-        console.log(`Cron job date range for ${region}:`, {
+        console.log(`Cron job date range for ${region}: `, {
             today: today.toISOString(),
             todayEnd: todayEnd.toISOString()
         });
@@ -47,7 +48,7 @@ const checkLotteryResults = async (region, Model) => {
         }).lean();
 
         if (!result) {
-            console.error(`Không tìm thấy kết quả ${region} cho ngày:`, today.toISOString());
+            console.error(`Không tìm thấy kết quả ${region} cho ngày: `, today.toISOString());
             broadcastComment({
                 type: 'LOTTERY_RESULT_ERROR',
                 data: { message: `Không tìm thấy kết quả ${region} cho ngày hiện tại` },
@@ -56,7 +57,7 @@ const checkLotteryResults = async (region, Model) => {
             return;
         }
 
-        console.log(`${region} result found:`, {
+        console.log(`${region} result found: `, {
             drawDate: result.drawDate,
             specialPrize: result.specialPrize,
             firstPrize: result.firstPrize
@@ -75,10 +76,13 @@ const checkLotteryResults = async (region, Model) => {
 
         const registrations = await LotteryRegistration.find({
             region,
-            createdAt: { $gte: today, $lte: todayEnd }
-        }).populate('userId', 'username telegramId winCount');
+            createdAt: { $gte: today, $lte: todayEnd },
+            isEvent: false,
+            isReward: false
+        }).populate('userId', 'username fullname img level points titles telegramId winCount')
+            .populate('eventId', 'title viewCount').lean();
 
-        console.log(`Registrations to check for ${region}:`, registrations.length);
+        console.log(`Registrations to check for ${region}: `, registrations.length);
 
         for (const registration of registrations) {
             if (registration.result.isChecked) {
@@ -132,17 +136,22 @@ const checkLotteryResults = async (region, Model) => {
                 }
             }
 
-            registration.result = {
-                isChecked: true,
-                isWin,
-                winningNumbers,
-                matchedPrizes,
-                checkedAt: moment().tz('Asia/Ho_Chi_Minh').toDate()
-            };
-            await registration.save();
+            await LotteryRegistration.updateOne(
+                { _id: registration._id },
+                {
+                    result: {
+                        isChecked: true,
+                        isWin,
+                        winningNumbers,
+                        matchedPrizes,
+                        checkedAt: moment().tz('Asia/Ho_Chi_Minh').toDate()
+                    }
+                }
+            );
 
             const populatedRegistration = await LotteryRegistration.findById(registration._id)
-                .populate('userId', 'username fullname level points titles telegramId winCount')
+                .populate('userId', 'username fullname img level points titles telegramId winCount')
+                .populate('eventId', 'title viewCount')
                 .lean();
 
             console.log('Updated registration:', {
@@ -168,13 +177,27 @@ const checkLotteryResults = async (region, Model) => {
                         _id: updatedUser._id,
                         points: updatedUser.points,
                         titles: updatedUser.titles,
-                        winCount: updatedUser.winCount
+                        winCount: updatedUser.winCount,
+                        img: updatedUser.img
                     },
                     room: 'leaderboard'
                 });
+
+                broadcastComment({
+                    type: 'USER_REWARDED',
+                    data: {
+                        userId: updatedUser._id,
+                        username: updatedUser.username,
+                        pointsAwarded: 50,
+                        region: registration.region,
+                        eventId: populatedRegistration.eventId?._id.toString(),
+                        eventTitle: populatedRegistration.eventId?.title || 'Không có sự kiện'
+                    },
+                    room: 'lotteryFeed'
+                });
             }
 
-            const user = registration.userId;
+            const user = populatedRegistration.userId;
             if (user.telegramId) {
                 const message = isWin
                     ? `Chúc mừng ${user.username}! Bạn đã trúng số miền ${region} ngày ${moment(today).format('DD-MM-YYYY')}:\n` +
@@ -187,14 +210,14 @@ const checkLotteryResults = async (region, Model) => {
                 try {
                     await bot.sendMessage(user.telegramId, message);
                 } catch (err) {
-                    console.error(`Lỗi gửi thông báo Telegram cho ${user.username}:`, err.message);
+                    console.error(`Lỗi gửi thông báo Telegram cho ${user.username}: `, err.message);
                 }
             }
         }
 
         console.log(`Hoàn tất đối chiếu kết quả ${region}.`);
     } catch (err) {
-        console.error(`Lỗi khi đối chiếu kết quả ${region}:`, err.message);
+        console.error(`Lỗi khi đối chiếu kết quả ${region}: `, err.message);
         broadcastComment({
             type: 'LOTTERY_RESULT_ERROR',
             data: { message: `Lỗi khi đối chiếu kết quả ${region}` },
@@ -211,9 +234,12 @@ router.get('/awards', async (req, res) => {
 
         const winners = await LotteryRegistration.find({
             'result.isWin': true,
-            createdAt: { $gte: today, $lte: todayEnd }
+            createdAt: { $gte: today, $lte: todayEnd },
+            isEvent: false,
+            isReward: false
         })
             .populate('userId', 'username fullname img titles points level winCount')
+            .populate('eventId', 'title viewCount')
             .lean();
 
         console.log('Winners fetched:', winners.length);
@@ -238,7 +264,8 @@ router.get('/awards', async (req, res) => {
                 titles: user.titles,
                 points: user.points,
                 level: user.level,
-                highestTitle
+                highestTitle,
+                eventTitle: winner.eventId?.title || 'Không có sự kiện'
             };
         });
 
@@ -252,38 +279,81 @@ router.get('/awards', async (req, res) => {
 
 router.get('/check-limit', authenticate, async (req, res) => {
     try {
-        const { userId, startDate, endDate } = req.query;
+        const { userId, startDate, endDate, eventId } = req.query;
         if (!userId || !startDate || !endDate) {
+            console.log('Missing required query params:', { userId, startDate, endDate });
             return res.status(400).json({ message: 'Thiếu userId, startDate hoặc endDate' });
         }
-        console.log('Check-limit query:', { userId, startDate, endDate });
-        const registrations = await LotteryRegistration.find({
-            userId: new mongoose.Types.ObjectId(userId),
-            createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
-        });
-        console.log('Check-limit response:', registrations);
+
+        let queryUserId;
+        try {
+            queryUserId = new mongoose.Types.ObjectId(userId);
+        } catch (err) {
+            console.log('Invalid userId:', userId);
+            return res.status(400).json({ message: 'userId không hợp lệ' });
+        }
+
+        const query = {
+            userId: queryUserId,
+            createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) },
+            isEvent: false,
+            isReward: false
+        };
+
+        if (eventId) {
+            try {
+                query.eventId = new mongoose.Types.ObjectId(eventId);
+            } catch (err) {
+                console.log('Invalid eventId:', eventId);
+                return res.status(400).json({ message: 'eventId không hợp lệ' });
+            }
+        }
+
+        console.log('Check-limit query:', { userId, startDate, endDate, eventId });
+        const registrations = await LotteryRegistration.find(query)
+            .populate('userId', 'username fullname img level points titles telegramId winCount')
+            .populate('eventId', 'title viewCount')
+            .lean();
+        console.log('Check-limit response:', registrations.length, registrations);
+
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.status(200).json({ registrations });
+        res.status(200).json({ registrations: registrations || [] });
     } catch (err) {
-        console.error('Error in /lottery/check-limit:', err.message);
-        res.status(500).json({ message: err.message || 'Đã có lỗi xảy ra' });
+        console.error('Error in /lottery/check-limit:', err.message, err.stack);
+        res.status(500).json({ message: err.message || 'Đã có lỗi khi kiểm tra trạng thái đăng ký' });
     }
 });
 
-router.get('/registrations', async (req, res) => {
+router.get('/registrations', authenticate, async (req, res) => {
     try {
-        const { region, userId, page = 1, limit = 20 } = req.query;
-        const query = {};
-        if (region) query.region = region;
+        const { region, userId, eventId, page = 1, limit = 20 } = req.query;
+        const query = {
+            isReward: false,
+            $or: [
+                { isEvent: true },
+                { region: region || { $in: ['Nam', 'Trung', 'Bac'] } }
+            ]
+        };
         if (userId) {
             try {
                 query.userId = new mongoose.Types.ObjectId(userId);
             } catch (err) {
+                console.log('Invalid userId:', userId);
                 return res.status(400).json({ message: 'userId không hợp lệ' });
             }
         }
+        if (eventId) {
+            try {
+                query.eventId = new mongoose.Types.ObjectId(eventId);
+            } catch (err) {
+                console.log('Invalid eventId:', eventId);
+                return res.status(400).json({ message: 'eventId không hợp lệ' });
+            }
+        }
+        console.log('Registrations query:', { region, userId, eventId, page, limit });
         const registrations = await LotteryRegistration.find(query)
-            .populate('userId', 'username fullname level points titles telegramId winCount')
+            .populate('userId', 'username fullname img level points titles telegramId winCount')
+            .populate('eventId', 'title viewCount')
             .sort({ createdAt: -1 })
             .skip((page - 1) * Number(limit))
             .limit(Number(limit))
@@ -352,17 +422,24 @@ router.get('/results', authenticate, async (req, res) => {
 
 router.post('/register', authenticate, async (req, res) => {
     try {
-        const { region, numbers } = req.body;
-        if (!['Nam', 'Trung', 'Bac'].includes(region)) {
-            return res.status(400).json({ message: 'Miền không hợp lệ' });
+        const { eventId, region, numbers } = req.body;
+        if (!eventId || !region || !['Nam', 'Trung', 'Bac'].includes(region)) {
+            return res.status(400).json({ message: 'Event ID và miền là bắt buộc' });
         }
+
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ message: 'Không tìm thấy sự kiện' });
+        }
+
         if (!checkRegistrationTime(region)) {
             return res.status(400).json({ message: `Đăng ký miền ${region} đã đóng. Vui lòng thử lại sau 18:40.` });
         }
+
         if (numbers.bachThuLo && !/^\d{2}$/.test(numbers.bachThuLo)) {
             return res.status(400).json({ message: 'Bạch thủ lô phải là số 2 chữ số (00-99)' });
         }
-        if (numbers.songThuLo.length > 0) {
+        if (numbers.songThuLo && numbers.songThuLo.length > 0) {
             if (numbers.songThuLo.length !== 2 || !numbers.songThuLo.every(num => /^\d{2}$/.test(num))) {
                 return res.status(400).json({ message: 'Song thủ lô phải gồm 2 số, mỗi số 2 chữ số' });
             }
@@ -373,18 +450,29 @@ router.post('/register', authenticate, async (req, res) => {
         if (numbers.cham && !/^\d{1}$/.test(numbers.cham)) {
             return res.status(400).json({ message: 'Chạm phải là số 1 chữ số (0-9)' });
         }
+
+        if (!numbers.bachThuLo && (!numbers.songThuLo || numbers.songThuLo.length === 0) && !numbers.threeCL && !numbers.cham) {
+            return res.status(400).json({ message: 'Phải cung cấp ít nhất một số để đăng ký' });
+        }
+
         const todayStart = moment().tz('Asia/Ho_Chi_Minh').startOf('day').toDate();
         const todayEnd = moment().tz('Asia/Ho_Chi_Minh').endOf('day').toDate();
         const existingRegistration = await LotteryRegistration.findOne({
             userId: new mongoose.Types.ObjectId(req.user.userId),
+            eventId: new mongoose.Types.ObjectId(eventId),
             region,
-            createdAt: { $gte: todayStart, $lte: todayEnd }
+            createdAt: { $gte: todayStart, $lte: todayEnd },
+            isEvent: false,
+            isReward: false
         });
+
         if (existingRegistration) {
-            return res.status(400).json({ message: `Bạn đã đăng ký cho miền ${region} hôm nay. Vui lòng thử lại vào ngày mai.` });
+            return res.status(400).json({ message: `Bạn đã đăng ký cho miền ${region} hôm nay cho sự kiện này.` });
         }
+
         const registration = new LotteryRegistration({
             userId: new mongoose.Types.ObjectId(req.user.userId),
+            eventId: new mongoose.Types.ObjectId(eventId),
             region,
             numbers,
             result: {
@@ -398,18 +486,25 @@ router.post('/register', authenticate, async (req, res) => {
                 },
                 matchedPrizes: [],
                 checkedAt: null
-            }
+            },
+            isEvent: false,
+            isReward: false
         });
+
         await registration.save();
         console.log('Saved registration:', {
             id: registration._id,
             userId: registration.userId,
-            createdAt: registration.createdAt,
-            region
+            eventId: registration.eventId,
+            region,
+            createdAt: registration.createdAt
         });
+
         const populatedRegistration = await LotteryRegistration.findById(registration._id)
-            .populate('userId', 'username fullname level points titles telegramId winCount')
+            .populate('userId', 'username fullname img level points titles telegramId winCount')
+            .populate('eventId', 'title viewCount')
             .lean();
+
         const user = await userModel.findById(new mongoose.Types.ObjectId(req.user.userId));
         if (!user) {
             return res.status(404).json({ message: 'Người dùng không tồn tại' });
@@ -420,11 +515,15 @@ router.post('/register', authenticate, async (req, res) => {
         console.log('Broadcasting NEW_LOTTERY_REGISTRATION:', {
             registrationId: registration._id,
             region,
-            userId: req.user.userId
+            userId: req.user.userId,
+            eventId
         });
         broadcastComment({
             type: 'NEW_LOTTERY_REGISTRATION',
-            data: populatedRegistration,
+            data: {
+                ...populatedRegistration,
+                eventId: populatedRegistration.eventId?._id.toString()
+            },
             room: 'lotteryFeed'
         });
         broadcastComment({
@@ -433,7 +532,8 @@ router.post('/register', authenticate, async (req, res) => {
                 _id: updatedUser._id,
                 points: updatedUser.points,
                 titles: updatedUser.titles,
-                winCount: updatedUser.winCount
+                winCount: updatedUser.winCount,
+                img: updatedUser.img
             },
             room: 'leaderboard'
         });
@@ -443,17 +543,20 @@ router.post('/register', authenticate, async (req, res) => {
             message: 'Đăng ký thành công',
             registration: {
                 userId: registration.userId,
+                eventId: registration.eventId,
                 region: registration.region,
                 numbers: registration.numbers,
                 createdAt: registration.createdAt,
-                result: registration.result
+                result: registration.result,
+                eventTitle: populatedRegistration.eventId?.title || 'Không có sự kiện'
             },
             user: {
                 id: updatedUser._id,
                 points: updatedUser.points,
                 titles: updatedUser.titles,
                 level: updatedUser.level,
-                winCount: updatedUser.winCount
+                winCount: updatedUser.winCount,
+                img: updatedUser.img
             }
         });
     } catch (err) {
@@ -469,7 +572,7 @@ router.put('/update/:registrationId', authenticate, async (req, res) => {
 
         const registration = await LotteryRegistration.findById(registrationId);
         if (!registration) {
-            return res.status(404).json({ message: 'Đăng ký không tồn tại' });
+            return res.status(400).json({ message: 'Đăng ký không tồn tại' });
         }
 
         if (registration.userId.toString() !== req.user.userId) {
@@ -487,7 +590,7 @@ router.put('/update/:registrationId', authenticate, async (req, res) => {
         if (numbers.bachThuLo && !/^\d{2}$/.test(numbers.bachThuLo)) {
             return res.status(400).json({ message: 'Bạch thủ lô phải là số 2 chữ số (00-99)' });
         }
-        if (numbers.songThuLo.length > 0) {
+        if (numbers.songThuLo && numbers.songThuLo.length > 0) {
             if (numbers.songThuLo.length !== 2 || !numbers.songThuLo.every(num => /^\d{2}$/.test(num))) {
                 return res.status(400).json({ message: 'Song thủ lô phải gồm 2 số, mỗi số 2 chữ số' });
             }
@@ -509,11 +612,16 @@ router.put('/update/:registrationId', authenticate, async (req, res) => {
         await registration.save();
 
         const populatedRegistration = await LotteryRegistration.findById(registration._id)
-            .populate('userId', 'username fullname level points titles telegramId winCount')
+            .populate('userId', 'username fullname img level points titles telegramId winCount')
+            .populate('eventId', 'title viewCount')
             .lean();
+
         broadcastComment({
             type: 'UPDATE_LOTTERY_REGISTRATION',
-            data: populatedRegistration,
+            data: {
+                ...populatedRegistration,
+                eventId: populatedRegistration.eventId?._id.toString()
+            },
             room: 'lotteryFeed'
         });
 
@@ -522,12 +630,14 @@ router.put('/update/:registrationId', authenticate, async (req, res) => {
             message: 'Chỉnh sửa đăng ký thành công',
             registration: {
                 userId: registration.userId,
+                eventId: registration.eventId,
                 region: registration.region,
                 numbers: registration.numbers,
                 createdAt: registration.createdAt,
                 updatedAt: registration.updatedAt,
                 updatedCount: registration.updatedCount,
-                result: registration.result
+                result: registration.result,
+                eventTitle: populatedRegistration.eventId?.title || 'Không có sự kiện'
             }
         });
     } catch (err) {
@@ -538,34 +648,46 @@ router.put('/update/:registrationId', authenticate, async (req, res) => {
 
 router.get('/check-results', authenticate, async (req, res) => {
     try {
-        const { date } = req.query;
+        const { date, eventId } = req.query;
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? moment.tz(date, 'DD-MM-YYYY', 'Asia/Ho_Chi_Minh').startOf('day').toDate()
             : moment().tz('Asia/Ho_Chi_Minh').startOf('day').toDate();
-
-        console.log('Check-results query:', {
-            userId: req.user.userId,
-            targetDate: targetDate.toISOString(),
-            endDate: moment(targetDate).endOf('day').toDate().toISOString()
-        });
-
-        const registrations = await LotteryRegistration.find({
+        const query = {
             userId: new mongoose.Types.ObjectId(req.user.userId),
             createdAt: {
                 $gte: targetDate,
                 $lte: moment(targetDate).endOf('day').toDate()
+            },
+            isEvent: false,
+            isReward: false
+        };
+        if (eventId) {
+            try {
+                query.eventId = new mongoose.Types.ObjectId(eventId);
+            } catch (err) {
+                console.log('Invalid eventId:', eventId);
+                return res.status(400).json({ message: 'eventId không hợp lệ' });
             }
-        }).populate('userId', 'username telegramId winCount');
-
+        }
+        console.log('Check-results query:', {
+            userId: req.user.userId,
+            targetDate: targetDate.toISOString(),
+            endDate: moment(targetDate).endOf('day').toDate().toISOString(),
+            eventId
+        });
+        const registrations = await LotteryRegistration.find(query)
+            .populate('userId', 'username fullname img level points titles telegramId winCount')
+            .populate('eventId', 'title viewCount')
+            .lean();
         console.log('Check-results response:', registrations.map(r => ({
             id: r._id,
             region: r.region,
+            eventId: r.eventId,
             createdAt: r.createdAt,
             result: r.result
         })));
-
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.status(200).json({ registrations });
+        res.status(200).json({ registrations: registrations || [] });
     } catch (err) {
         console.error('Error in /lottery/check-results:', err.message);
         res.status(500).json({ message: err.message || 'Đã có lỗi khi lấy kết quả đối chiếu' });

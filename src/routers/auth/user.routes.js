@@ -3,10 +3,12 @@
 const express = require("express");
 const router = express.Router();
 const userModel = require("../../models/users.models");
+const LotteryRegistration = require("../../models/lottery.models.js");
 const { authenticate } = require("./auth.routes");
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const path = require('path');
+const moment = require('moment-timezone');
 const { broadcastComment } = require('../../websocket.js');
 
 cloudinary.config({
@@ -171,24 +173,142 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: "Người dùng không tồn tại" });
         }
+        const oldPoints = user.points;
         if (titles) user.titles = titles;
         if (level) user.level = level;
         if (points !== undefined) user.points = points;
         const updatedUser = await user.save();
+
+        // Phát thông báo USER_UPDATED
         broadcastComment({
             type: 'USER_UPDATED',
             data: {
                 _id: updatedUser._id,
                 points: updatedUser.points,
                 titles: updatedUser.titles,
-                winCount: updatedUser.winCount
+                winCount: updatedUser.winCount,
+                img: updatedUser.img,
+                fullname: updatedUser.fullname
             },
             room: 'leaderboard'
         });
+        broadcastComment({
+            type: 'USER_UPDATED',
+            data: {
+                _id: updatedUser._id,
+                points: updatedUser.points,
+                titles: updatedUser.titles,
+                winCount: updatedUser.winCount,
+                img: updatedUser.img,
+                fullname: updatedUser.fullname
+            },
+            room: 'lotteryFeed'
+        });
+
+        // Nếu điểm thay đổi, lưu thông báo phát thưởng và phát USER_REWARDED
+        if (points !== undefined && points > oldPoints) {
+            const pointsAwarded = points - oldPoints;
+            const rewardNotification = new LotteryRegistration({
+                userId: id,
+                isReward: true,
+                pointsAwarded,
+                createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate()
+            });
+            await rewardNotification.save();
+
+            broadcastComment({
+                type: 'USER_REWARDED',
+                data: {
+                    userId: updatedUser._id,
+                    username: updatedUser.username,
+                    fullname: updatedUser.fullname,
+                    img: updatedUser.img,
+                    titles: updatedUser.titles,
+                    points: updatedUser.points,
+                    winCount: updatedUser.winCount,
+                    pointsAwarded,
+                    awardedAt: rewardNotification.createdAt
+                },
+                room: 'lotteryFeed'
+            });
+        }
+
         res.status(200).json({ message: "Cập nhật thông tin người dùng thành công", user: updatedUser });
     } catch (error) {
         console.error("Error in /users/:id:", error.message);
         res.status(500).json({ error: "Không thể cập nhật người dùng" });
+    }
+});
+
+router.post("/reward", authenticate, isAdmin, async (req, res) => {
+    try {
+        const { userId, points } = req.body;
+        if (!userId || !points || points <= 0) {
+            return res.status(400).json({ error: "Cần cung cấp userId và số điểm hợp lệ" });
+        }
+        const user = await userModel.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: "Người dùng không tồn tại" });
+        }
+        user.points = (user.points || 0) + points;
+        const updatedUser = await user.save();
+
+        // Lưu thông báo phát thưởng
+        const rewardNotification = new LotteryRegistration({
+            userId,
+            isReward: true,
+            pointsAwarded: points,
+            createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate()
+        });
+        await rewardNotification.save();
+
+        // Phát thông báo USER_UPDATED
+        broadcastComment({
+            type: 'USER_UPDATED',
+            data: {
+                _id: updatedUser._id,
+                points: updatedUser.points,
+                titles: updatedUser.titles,
+                winCount: updatedUser.winCount,
+                img: updatedUser.img,
+                fullname: updatedUser.fullname
+            },
+            room: 'leaderboard'
+        });
+        broadcastComment({
+            type: 'USER_UPDATED',
+            data: {
+                _id: updatedUser._id,
+                points: updatedUser.points,
+                titles: updatedUser.titles,
+                winCount: updatedUser.winCount,
+                img: updatedUser.img,
+                fullname: updatedUser.fullname
+            },
+            room: 'lotteryFeed'
+        });
+
+        // Phát thông báo USER_REWARDED
+        broadcastComment({
+            type: 'USER_REWARDED',
+            data: {
+                userId: updatedUser._id,
+                username: updatedUser.username,
+                fullname: updatedUser.fullname,
+                img: updatedUser.img,
+                titles: updatedUser.titles,
+                points: updatedUser.points,
+                winCount: updatedUser.winCount,
+                pointsAwarded: points,
+                awardedAt: rewardNotification.createdAt
+            },
+            room: 'lotteryFeed'
+        });
+
+        res.status(200).json({ message: "Phát thưởng thành công", user: updatedUser });
+    } catch (error) {
+        console.error("Error in /users/reward:", error.message);
+        res.status(500).json({ error: "Không thể phát thưởng", details: error.message });
     }
 });
 
@@ -212,7 +332,6 @@ router.post("/upload-avatar", authenticate, upload.single('avatar'), async (req,
             console.error('Invalid req.user:', req.user);
             return res.status(401).json({ error: "Không thể xác định người dùng. Vui lòng đăng nhập lại." });
         }
-        const userId = req.user.id || req.user.userId;
         if (!req.file) {
             return res.status(400).json({ error: "Không có file được tải lên" });
         }
@@ -220,7 +339,7 @@ router.post("/upload-avatar", authenticate, upload.single('avatar'), async (req,
             originalname: req.file.originalname,
             mimetype: req.file.mimetype,
             size: req.file.size,
-            userId,
+            userId: req.user.id || req.user.userId,
         });
         const bufferStream = require('stream').PassThrough();
         bufferStream.end(req.file.buffer);
@@ -228,7 +347,7 @@ router.post("/upload-avatar", authenticate, upload.single('avatar'), async (req,
             const uploadStream = cloudinary.uploader.upload_stream(
                 {
                     folder: 'avatars',
-                    public_id: `${userId}_${Date.now()}`,
+                    public_id: `${req.user.id || req.user.userId}_${Date.now()}`,
                     resource_type: 'image',
                     transformation: [{ width: 200, height: 200, crop: 'fill', quality: 'auto', fetch_format: 'auto' }],
                 },
@@ -244,21 +363,28 @@ router.post("/upload-avatar", authenticate, upload.single('avatar'), async (req,
             public_id: result.public_id,
         });
         const user = await userModel
-            .findByIdAndUpdate(userId, { img: result.secure_url }, { new: true })
+            .findByIdAndUpdate(req.user.id || req.user.userId, { img: result.secure_url }, { new: true })
             .select("-password -refreshTokens");
         if (!user) {
             return res.status(404).json({ error: "Người dùng không tồn tại" });
         }
+        const userUpdateData = {
+            _id: user._id,
+            points: user.points,
+            titles: user.titles,
+            winCount: user.winCount,
+            img: user.img,
+            fullname: user.fullname
+        };
         broadcastComment({
             type: 'USER_UPDATED',
-            data: {
-                _id: user._id,
-                points: user.points,
-                titles: user.titles,
-                winCount: user.winCount,
-                img: user.img
-            },
+            data: userUpdateData,
             room: 'leaderboard'
+        });
+        broadcastComment({
+            type: 'USER_UPDATED',
+            data: userUpdateData,
+            room: 'lotteryFeed'
         });
         res.status(200).json({ message: "Tải ảnh đại diện thành công", user });
     } catch (error) {

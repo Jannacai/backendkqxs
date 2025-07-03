@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const moment = require('moment-timezone'); // Thêm import moment-timezone
+const moment = require('moment-timezone');
 
 const lotteryRegistrationSchema = new mongoose.Schema({
     userId: {
@@ -7,10 +7,16 @@ const lotteryRegistrationSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    eventId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Event',
+        index: true,
+        required: false // Không bắt buộc cho thông báo phát thưởng hoặc sự kiện
+    },
     region: {
         type: String,
-        required: true,
-        enum: ['Nam', 'Trung', 'Bac']
+        enum: ['Nam', 'Trung', 'Bac', ''], // Thêm '' cho thông báo phát thưởng hoặc sự kiện
+        default: ''
     },
     numbers: {
         bachThuLo: { type: String, default: null },
@@ -47,10 +53,31 @@ const lotteryRegistrationSchema = new mongoose.Schema({
             matchedPrizes: [],
             checkedAt: null
         }
+    },
+    isReward: {
+        type: Boolean,
+        default: false
+    },
+    pointsAwarded: {
+        type: Number,
+        default: null
+    },
+    isEvent: {
+        type: Boolean,
+        default: false
+    },
+    title: {
+        type: String,
+        default: null
+    },
+    type: {
+        type: String,
+        enum: ['event', 'hot_news', null],
+        default: null
     }
 }, {
     timestamps: {
-        currentTime: () => moment.tz('Asia/Ho_Chi_Minh').toDate() // Đặt múi giờ cho timestamps
+        currentTime: () => moment.tz('Asia/Ho_Chi_Minh').toDate()
     }
 });
 

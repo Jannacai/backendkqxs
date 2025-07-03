@@ -57,6 +57,16 @@ function initializeWebSocket(server) {
             console.log(`Client ${socket.userId} joined leaderboard room`);
         });
 
+        socket.on("joinEventFeed", () => {
+            socket.join("eventFeed");
+            console.log(`Client ${socket.userId} joined eventFeed room`);
+        });
+
+        socket.on("joinEvent", (eventId) => {
+            socket.join(`event:${eventId}`);
+            console.log(`Client ${socket.userId} joined room event:${eventId}`);
+        });
+
         socket.on("disconnect", () => {
             console.log(`Socket.IO client disconnected: ${socket.userId}`);
         });
@@ -69,7 +79,7 @@ function initializeWebSocket(server) {
     console.log("Socket.IO server initialized");
 }
 
-function broadcastComment({ type, data, room, postId }) {
+function broadcastComment({ type, data, room, postId, eventId }) {
     if (!io) {
         console.warn("Socket.IO server not initialized, skipping broadcast");
         return;
@@ -80,6 +90,9 @@ function broadcastComment({ type, data, room, postId }) {
     } else if (postId) {
         io.to(`post:${postId}`).emit(type, data);
         console.log(`Broadcasted ${type} to room post:${postId}`);
+    } else if (eventId) {
+        io.to(`event:${eventId}`).emit(type, data);
+        console.log(`Broadcasted ${type} to room event:${eventId}`);
     } else {
         io.to("chat").emit(type, data);
         console.log(`Broadcasted ${type} to chat room`);

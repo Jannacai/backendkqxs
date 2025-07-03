@@ -9,6 +9,7 @@ const resultsRouterMB = require('./kqxsMB/resultMB.routes');
 const resultsRouterMN = require('./kqxsMN/resultMN.routes');
 const resultsRouterMT = require('./kqxsMT/resultMT.routes');
 const postsRouter = require('./post/post.routes');
+const eventRouter = require('./Events/events.routes')
 const statsRouter = require('./stats_thongke/stats.routes');
 const calculate3D4D = require('./Dan3D4D/calculate3D4D.routes');
 const telegram = require('./routestelegram');
@@ -19,6 +20,7 @@ const Routes = (app) => {
     app.use('/api/comments', commentRoutes);
     app.use('/api/auth', authK);
     app.use('/api/lottery', lotteryRoutes);
+    app.use('/api/events', eventRouter);
     app.use('/api/ketqua', resultsRouterMN);
     app.use('/api/ketquaxs', resultsRouterMT);
     app.use('/api/kqxs', resultsRouterMB);
