@@ -11,6 +11,7 @@ const XSMB = require('../../models/XS_MB.models');
 const XSMN = require('../../models/XS_MN.models');
 const XSMT = require('../../models/XS_MT.models');
 const Event = require('../../models/event.models');
+const Notification = require('../../models/notification.models'); // Thêm model Notification
 const { broadcastComment } = require('../../websocket.js');
 const cron = require('node-cron');
 const TelegramBot = require('node-telegram-bot-api');
@@ -171,6 +172,17 @@ const checkLotteryResults = async (region, Model) => {
                 user.points += 50;
                 user.winCount = (user.winCount || 0) + 1;
                 const updatedUser = await user.save();
+
+                // Tạo thông báo phát thưởng
+                const rewardNotification = new Notification({
+                    userId: user._id,
+                    type: 'USER_REWARDED',
+                    content: `Bạn đã nhận được 50 điểm thưởng từ xổ số miền ${region}!`,
+                    isRead: false,
+                    createdAt: new Date(),
+                });
+                await rewardNotification.save();
+
                 broadcastComment({
                     type: 'USER_UPDATED',
                     data: {
@@ -191,7 +203,8 @@ const checkLotteryResults = async (region, Model) => {
                         pointsAwarded: 50,
                         region: registration.region,
                         eventId: populatedRegistration.eventId?._id.toString(),
-                        eventTitle: populatedRegistration.eventId?.title || 'Không có sự kiện'
+                        eventTitle: populatedRegistration.eventId?.title || 'Không có sự kiện',
+                        notificationId: rewardNotification._id
                     },
                     room: 'lotteryFeed'
                 });
@@ -225,6 +238,67 @@ const checkLotteryResults = async (region, Model) => {
         });
     }
 };
+
+// Thêm endpoint để tạo sự kiện mới
+router.post('/events', authenticate, async (req, res) => {
+    try {
+        const { title, type, description, image } = req.body;
+        if (!title || !type) {
+            return res.status(400).json({ message: 'Tiêu đề và loại sự kiện là bắt buộc' });
+        }
+
+        const event = new Event({
+            title,
+            type,
+            description,
+            image,
+            createdBy: req.user.userId,
+            createdAt: new Date(),
+            viewCount: 0
+        });
+        await event.save();
+
+        // Tạo thông báo cho tất cả người dùng
+        const users = await userModel.find({}).select('_id');
+        const notificationPromises = users.map(user => {
+            const notification = new Notification({
+                userId: user._id,
+                type: 'NEW_EVENT',
+                content: `Sự kiện mới: ${title}`,
+                isRead: false,
+                createdAt: new Date(),
+                eventId: event._id
+            });
+            return notification.save();
+        });
+        const notifications = await Promise.all(notificationPromises);
+
+        // Gửi thông báo WebSocket cho sự kiện mới
+        broadcastComment({
+            type: 'NEW_EVENT',
+            data: {
+                eventId: event._id,
+                title,
+                description,
+                createdAt: event.createdAt,
+                notifications: notifications.map(n => ({
+                    _id: n._id,
+                    userId: n.userId,
+                    content: n.content,
+                    isRead: n.isRead,
+                    createdAt: n.createdAt,
+                    eventId: n.eventId
+                }))
+            },
+            room: 'lotteryFeed'
+        });
+
+        res.status(201).json({ message: 'Tạo sự kiện thành công', event });
+    } catch (err) {
+        console.error('Error in /lottery/events:', err.message);
+        res.status(500).json({ message: err.message || 'Đã có lỗi khi tạo sự kiện' });
+    }
+});
 
 router.get('/awards', async (req, res) => {
     try {
@@ -326,14 +400,11 @@ router.get('/check-limit', authenticate, async (req, res) => {
 
 router.get('/registrations', authenticate, async (req, res) => {
     try {
-        const { region, userId, eventId, page = 1, limit = 20 } = req.query;
-        const query = {
-            isReward: false,
-            $or: [
-                { isEvent: true },
-                { region: region || { $in: ['Nam', 'Trung', 'Bac'] } }
-            ]
-        };
+        const { region, userId, eventId, page = 1, limit = 20, isReward, isEvent } = req.query;
+        const query = {};
+        if (region) {
+            query.region = region;
+        }
         if (userId) {
             try {
                 query.userId = new mongoose.Types.ObjectId(userId);
@@ -350,7 +421,13 @@ router.get('/registrations', authenticate, async (req, res) => {
                 return res.status(400).json({ message: 'eventId không hợp lệ' });
             }
         }
-        console.log('Registrations query:', { region, userId, eventId, page, limit });
+        if (isReward !== undefined) {
+            query.isReward = isReward === 'true';
+        }
+        if (isEvent !== undefined) {
+            query.isEvent = isEvent === 'true';
+        }
+        console.log('Registrations query:', { region, userId, eventId, page, limit, isReward, isEvent });
         const registrations = await LotteryRegistration.find(query)
             .populate('userId', 'username fullname img level points titles telegramId winCount')
             .populate('eventId', 'title viewCount')
@@ -512,6 +589,17 @@ router.post('/register', authenticate, async (req, res) => {
         user.points += 10;
         const updatedUser = await user.save();
 
+        // Tạo thông báo khi người dùng đăng ký thành công
+        const registrationNotification = new Notification({
+            userId: user._id,
+            type: 'NEW_LOTTERY_REGISTRATION',
+            content: `Bạn đã đăng ký xổ số miền ${region} thành công!`,
+            isRead: false,
+            createdAt: new Date(),
+            eventId: eventId
+        });
+        await registrationNotification.save();
+
         console.log('Broadcasting NEW_LOTTERY_REGISTRATION:', {
             registrationId: registration._id,
             region,
@@ -522,7 +610,8 @@ router.post('/register', authenticate, async (req, res) => {
             type: 'NEW_LOTTERY_REGISTRATION',
             data: {
                 ...populatedRegistration,
-                eventId: populatedRegistration.eventId?._id.toString()
+                eventId: populatedRegistration.eventId?._id.toString(),
+                notificationId: registrationNotification._id
             },
             room: 'lotteryFeed'
         });

@@ -1,73 +1,80 @@
-const express = require("express");
+"use strict";
+
+const express = require('express');
 const router = express.Router();
-const notificationModel = require("../../models/notification.models");
-const { authenticate } = require("./auth.routes");
+const mongoose = require('mongoose');
+const { authenticate } = require('../auth/auth.routes');
+const Notification = require('../../models/notification.models');
 
-// GET: Lấy thông báo của người dùng
-router.get("/", authenticate, async (req, res) => {
+// Đánh dấu một thông báo là đã đọc
+router.post('/:id/read', authenticate, async (req, res) => {
     try {
-        const notifications = await notificationModel
-            .find({ userId: req.user.userId })
-            .populate("taggedBy", "username fullname")
-            .populate("commentId", "content")
-            .sort({ createdAt: -1 });
-        res.status(200).json(notifications);
-    } catch (error) {
-        console.error("Error in /notifications:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-
-// POST: Đánh dấu thông báo đã đọc
-router.post("/:id/read", authenticate, async (req, res) => {
-    try {
-        const notification = await notificationModel.findOne({
-            _id: req.params.id,
-            userId: req.user.userId,
-        });
-        if (!notification) {
-            return res.status(404).json({ error: "Thông báo không tồn tại" });
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: 'ID thông báo không hợp lệ' });
         }
+
+        const notification = await Notification.findById(id);
+        if (!notification) {
+            return res.status(404).json({ error: 'Không tìm thấy thông báo' });
+        }
+
+        if (notification.userId.toString() !== req.user.userId) {
+            return res.status(403).json({ error: 'Bạn không có quyền chỉnh sửa thông báo này' });
+        }
+
         notification.isRead = true;
         await notification.save();
-        res.status(200).json(notification);
-    } catch (error) {
-        console.error("Error in /notifications/:id/read:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.status(200).json({ message: 'Đánh dấu thông báo đã đọc thành công', notification });
+    } catch (err) {
+        console.error('Error in /notifications/:id/read:', err.message);
+        res.status(500).json({ error: err.message || 'Đã có lỗi khi đánh dấu thông báo đã đọc' });
     }
 });
 
-// POST: Đánh dấu tất cả thông báo đã đọc
-router.post("/read-all", authenticate, async (req, res) => {
+// Đánh dấu tất cả thông báo là đã đọc
+router.post('/read-all', authenticate, async (req, res) => {
     try {
-        await notificationModel.updateMany(
-            { userId: req.user.userId, isRead: false },
+        await Notification.updateMany(
+            { userId: new mongoose.Types.ObjectId(req.user.userId), isRead: false },
             { isRead: true }
         );
-        res.status(200).json({ message: "Đã đánh dấu tất cả thông báo đã đọc" });
-    } catch (error) {
-        console.error("Error in /notifications/read-all:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.status(200).json({ message: 'Đã đánh dấu tất cả thông báo là đã đọc' });
+    } catch (err) {
+        console.error('Error in /notifications/read-all:', err.message);
+        res.status(500).json({ error: err.message || 'Đã có lỗi khi đánh dấu tất cả thông báo đã đọc' });
     }
 });
 
-// DELETE: Xóa thông báo
-router.delete("/:id", authenticate, async (req, res) => {
+// Xóa một thông báo
+router.delete('/:id', authenticate, async (req, res) => {
     try {
-        const notification = await notificationModel.findOneAndDelete({
-            _id: req.params.id,
-            userId: req.user.userId,
-        });
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: 'ID thông báo không hợp lệ' });
+        }
+
+        const notification = await Notification.findById(id);
         if (!notification) {
-            return res.status(404).json({
-                error: "Thông báo không tồn tại" });
+            return res.status(404).json({ error: 'Không tìm thấy thông báo' });
         }
-        await notification.deleteOne();
-            res.status(200).json({ message: "Thông báo đã được xóa" });
-        } catch (error) {
-            console.error("Error in /notifications/:id DELETE:", error.message);
-            res.status(500).json({ error: "Internal Server Error" });
+
+        if (notification.userId.toString() !== req.user.userId) {
+            return res.status(403).json({ error: 'Bạn không có quyền xóa thông báo này' });
         }
-    });
+
+        await Notification.deleteOne({ _id: id });
+
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.status(200).json({ message: 'Xóa thông báo thành công' });
+    } catch (err) {
+        console.error('Error in /notifications/:id:', err.message);
+        res.status(500).json({ error: err.message || 'Đã có lỗi khi xóa thông báo' });
+    }
+});
 
 module.exports = router;
