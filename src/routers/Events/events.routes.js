@@ -4,10 +4,12 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const moment = require('moment-timezone');
-const { authenticate } = require('../auth/auth.routes.js');
+const { authenticate } = require('../auth/auth.routes');
 const Event = require('../../models/event.models');
 const LotteryRegistration = require('../../models/lottery.models');
-const { broadcastComment } = require('../../websocket.js');
+const Notification = require('../../models/notification.models');
+const User = require('../../models/users.models');
+const { broadcastComment } = require('../../websocket');
 
 const isAdmin = (req, res, next) => {
     if (!req.user || req.user.role !== 'ADMIN') {
@@ -28,14 +30,12 @@ router.get('/', async (req, res) => {
             .limit(Number(limit))
             .lean();
 
-        // Đếm số lượng người đăng ký cho mỗi sự kiện
         const eventIds = events.map(event => event._id);
         const registrationCounts = await LotteryRegistration.aggregate([
             { $match: { eventId: { $in: eventIds }, isEvent: false } },
             { $group: { _id: "$eventId", count: { $sum: 1 } } }
         ]);
 
-        // Gộp số lượng đăng ký và viewCount vào dữ liệu sự kiện
         const eventsWithCounts = events.map(event => ({
             ...event,
             registrationCount: registrationCounts.find(reg => reg._id.toString() === event._id.toString())?.count || 0,
@@ -46,7 +46,7 @@ router.get('/', async (req, res) => {
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.status(200).json({ events: eventsWithCounts, total, page, limit });
     } catch (err) {
-        console.error('Error in /events:', err.message);
+        console.error('Error in GET /events:', err.message);
         res.status(500).json({ message: err.message || 'Đã có lỗi khi lấy danh sách' });
     }
 });
@@ -75,21 +75,25 @@ router.get('/:id', async (req, res) => {
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.status(200).json({ ...event, registrationCount, viewCount: event.viewCount || 0 });
     } catch (err) {
-        console.error('Error in /events/:id:', err.message);
+        console.error('Error in GET /events/:id:', err.message);
         res.status(500).json({ message: err.message || 'Đã có lỗi khi lấy chi tiết' });
     }
 });
 
 router.post('/', authenticate, isAdmin, async (req, res) => {
     try {
-        const { title, content, type, lotteryFields } = req.body;
+        const { title, content, type, lotteryFields, startTime, endTime, rules, rewards, scoringMethod, notes } = req.body;
         if (!['event', 'hot_news'].includes(type)) {
             return res.status(400).json({ message: 'Loại không hợp lệ' });
         }
         if (!title || !content) {
             return res.status(400).json({ message: 'Tiêu đề và nội dung là bắt buộc' });
         }
-        const event = new Event({
+        if (startTime && endTime && moment(endTime).isBefore(startTime)) {
+            return res.status(400).json({ message: 'Thời gian kết thúc phải sau thời gian bắt đầu' });
+        }
+
+        const eventData = {
             title,
             content,
             type,
@@ -100,8 +104,20 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
                 threeCL: !!lotteryFields?.threeCL,
                 cham: !!lotteryFields?.cham
             },
-            viewCount: 0
-        });
+            viewCount: 0,
+            createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+            updatedAt: moment.tz('Asia/Ho_Chi_Minh').toDate()
+        };
+
+        // Thêm các trường không bắt buộc nếu được cung cấp và không rỗng
+        if (startTime) eventData.startTime = moment.tz(startTime, 'Asia/Ho_Chi_Minh').toDate();
+        if (endTime) eventData.endTime = moment.tz(endTime, 'Asia/Ho_Chi_Minh').toDate();
+        if (rules?.trim()) eventData.rules = rules.trim();
+        if (rewards?.trim()) eventData.rewards = rewards.trim();
+        if (scoringMethod?.trim()) eventData.scoringMethod = scoringMethod.trim();
+        if (notes?.trim()) eventData.notes = notes.trim();
+
+        const event = new Event(eventData);
         await event.save();
         const populatedEvent = await Event.findById(event._id)
             .populate('createdBy', 'username fullname img')
@@ -110,7 +126,7 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
         // Tạo document LotteryRegistration cho thông báo sự kiện
         const eventNotification = new LotteryRegistration({
             userId: new mongoose.Types.ObjectId(req.user.userId),
-            eventId: event._id.toString(), // Đảm bảo eventId là chuỗi
+            eventId: event._id.toString(),
             isEvent: true,
             title: populatedEvent.title,
             type: populatedEvent.type,
@@ -120,11 +136,37 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
         });
         await eventNotification.save();
 
-        // Gửi thông báo tới eventFeed
-        broadcastComment({
-            type: 'NEW_EVENT',
-            data: populatedEvent,
-            room: 'eventFeed'
+        // Tạo thông báo NEW_EVENT cho tất cả người dùng (bao gồm cả admin)
+        const users = await User.find().select('_id role').lean();
+        const notificationPromises = users.map(user => {
+            return new Notification({
+                userId: user._id,
+                type: 'NEW_EVENT',
+                content: `HOT!!! ${populatedEvent.type === 'event' ? 'sự kiện' : 'tin hot'}: ${populatedEvent.title} `,
+                isRead: false,
+                createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+                eventId: event._id.toString()
+            }).save();
+        });
+        const notifications = await Promise.all(notificationPromises);
+
+        // Gửi thông báo NEW_EVENT đến phòng riêng của từng người dùng
+        notifications.forEach(notification => {
+            console.log(`Broadcasting NEW_EVENT to user:${notification.userId} (role: ${users.find(u => u._id.toString() === notification.userId.toString())?.role})`);
+            broadcastComment({
+                type: 'NEW_EVENT',
+                data: {
+                    notificationId: notification._id.toString(),
+                    userId: notification.userId.toString(),
+                    type: 'NEW_EVENT',
+                    content: notification.content,
+                    isRead: false,
+                    createdAt: notification.createdAt,
+                    eventId: event._id.toString(),
+                    createdBy: populatedEvent.createdBy
+                },
+                room: `user:${notification.userId} `
+            });
         });
 
         // Gửi thông báo tới lotteryFeed
@@ -135,16 +177,19 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
             type: 'NEW_EVENT_NOTIFICATION',
             data: {
                 ...populatedNotification,
-                eventId: populatedNotification.eventId.toString() // Đảm bảo eventId là chuỗi
+                eventId: populatedNotification.eventId.toString()
             },
             room: 'lotteryFeed'
         });
 
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.status(200).json({ message: 'Đăng thành công', event: populatedEvent });
+        res.status(201).json({
+            message: 'Tạo sự kiện thành công',
+            event: populatedEvent
+        });
     } catch (err) {
-        console.error('Error in /events:', err.message);
-        res.status(500).json({ message: err.message || 'Đã có lỗi xảy ra' });
+        console.error('Error in POST /events:', err.message);
+        res.status(500).json({ error: err.message || 'Đã có lỗi khi tạo18 tạo sự kiện' });
     }
 });
 
@@ -174,12 +219,12 @@ router.post('/:id/comments', authenticate, async (req, res) => {
         broadcastComment({
             type: 'NEW_COMMENT',
             data: populatedEvent,
-            room: `event:${id}`
+            room: `event:${id} `
         });
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.status(200).json({ message: 'Bình luận thành công', event: populatedEvent });
     } catch (err) {
-        console.error('Error in /events/:id/comments:', err.message);
+        console.error('Error in POST /events/:id/comments:', err.message);
         res.status(500).json({ message: err.message || 'Đã có lỗi khi thêm bình luận' });
     }
 });

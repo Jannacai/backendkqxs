@@ -72,7 +72,7 @@ const lotteryRegistrationSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['event', 'hot_news', null],
+        enum: ['event', 'hot_news', 'USER_REWARDED', null],
         default: null
     }
 }, {
@@ -80,5 +80,7 @@ const lotteryRegistrationSchema = new mongoose.Schema({
         currentTime: () => moment.tz('Asia/Ho_Chi_Minh').toDate()
     }
 });
+
+lotteryRegistrationSchema.index({ userId: 1, type: 1, createdAt: -1 });
 
 module.exports = mongoose.model('LotteryRegistration', lotteryRegistrationSchema);

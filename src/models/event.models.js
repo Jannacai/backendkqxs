@@ -51,7 +51,31 @@ const eventSchema = new mongoose.Schema({
     },
     viewCount: {
         type: Number,
-        default: 0 // Thêm trường viewCount để lưu số lượt xem
+        default: 0
+    },
+    startTime: {
+        type: Date,
+        required: false
+    },
+    endTime: {
+        type: Date,
+        required: false
+    },
+    rules: {
+        type: String,
+        required: false
+    },
+    rewards: {
+        type: String,
+        required: false
+    },
+    scoringMethod: {
+        type: String,
+        required: false
+    },
+    notes: {
+        type: String,
+        required: false
     }
 }, {
     timestamps: {

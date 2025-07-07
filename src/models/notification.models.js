@@ -6,7 +6,7 @@ const notificationSchema = new mongoose.Schema({
     content: { type: String, required: true },
     isRead: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
-    eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: false },
+    eventId: { type: String, required: false }, // Thay đổi thành String
     commentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Comment', required: false },
     taggedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false }
 });

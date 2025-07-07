@@ -3,12 +3,14 @@
 const express = require("express");
 const router = express.Router();
 const userModel = require("../../models/users.models");
-const LotteryRegistration = require("../../models/lottery.models.js");
+const Notification = require("../../models/notification.models");
+const LotteryRegistration = require("../../models/lottery.models");
 const { authenticate } = require("./auth.routes");
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const path = require('path');
 const moment = require('moment-timezone');
+const mongoose = require('mongoose');
 const { broadcastComment } = require('../../websocket.js');
 
 cloudinary.config({
@@ -38,7 +40,7 @@ const upload = multer({
 });
 
 const isAdmin = (req, res, next) => {
-    if (!req.user || req.user.role !== 'ADMIN') {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'ADMIN')) {
         return res.status(403).json({ error: "Chỉ admin mới có quyền truy cập" });
     }
     next();
@@ -148,10 +150,12 @@ router.get("/", authenticate, isAdmin, async (req, res) => {
     }
 });
 
-router.get("/:id", authenticate, isAdmin, async (req, res) => {
+router.get("/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const user = await userModel.findById(id).select("-password -refreshTokens");
+        const user = await userModel
+            .findById(id)
+            .select("fullname img points level titles role winCount");
         if (!user) {
             return res.status(404).json({ error: "Người dùng không tồn tại" });
         }
@@ -180,54 +184,116 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
         const updatedUser = await user.save();
 
         // Phát thông báo USER_UPDATED
+        const userUpdateData = {
+            _id: updatedUser._id,
+            points: updatedUser.points,
+            titles: updatedUser.titles,
+            winCount: updatedUser.winCount,
+            img: updatedUser.img,
+            fullname: updatedUser.fullname
+        };
+        console.log('Broadcasting USER_UPDATED:', { room: 'leaderboard', data: userUpdateData });
         broadcastComment({
             type: 'USER_UPDATED',
-            data: {
-                _id: updatedUser._id,
-                points: updatedUser.points,
-                titles: updatedUser.titles,
-                winCount: updatedUser.winCount,
-                img: updatedUser.img,
-                fullname: updatedUser.fullname
-            },
+            data: userUpdateData,
             room: 'leaderboard'
         });
+        console.log('Broadcasting USER_UPDATED:', { room: 'lotteryFeed', data: userUpdateData });
         broadcastComment({
             type: 'USER_UPDATED',
-            data: {
-                _id: updatedUser._id,
-                points: updatedUser.points,
-                titles: updatedUser.titles,
-                winCount: updatedUser.winCount,
-                img: updatedUser.img,
-                fullname: updatedUser.fullname
-            },
+            data: userUpdateData,
             room: 'lotteryFeed'
         });
 
-        // Nếu điểm thay đổi, lưu thông báo phát thưởng và phát USER_REWARDED
+        // Nếu điểm thay đổi, tạo thông báo phát thưởng
         if (points !== undefined && points > oldPoints) {
             const pointsAwarded = points - oldPoints;
-            const rewardNotification = new LotteryRegistration({
-                userId: id,
-                isReward: true,
-                pointsAwarded,
-                createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate()
-            });
-            await rewardNotification.save();
+            const eventTitle = req.body.eventTitle || 'Cập nhật điểm';
+            const eventId = req.body.eventId || null;
 
+            // Lưu vào Notification cho UserAvatar
+            const notification = new Notification({
+                userId: id,
+                type: 'USER_REWARDED',
+                content: `Bạn đã được phát thưởng ${pointsAwarded} điểm cho sự kiện ${eventTitle}!`,
+                isRead: false,
+                createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+                eventId: eventId ? new mongoose.Types.ObjectId(eventId) : null
+            });
+            await notification.save();
+
+            const populatedNotification = await Notification.findById(notification._id)
+                .populate('userId', 'username fullname img titles points winCount')
+                .populate('eventId', 'title')
+                .lean();
+
+            console.log('Broadcasting USER_REWARDED:', {
+                room: 'rewardFeed', data: {
+                    notificationId: populatedNotification._id.toString(),
+                    userId: populatedNotification.userId._id.toString(),
+                    pointsAwarded,
+                    eventTitle
+                }
+            });
             broadcastComment({
                 type: 'USER_REWARDED',
                 data: {
-                    userId: updatedUser._id,
-                    username: updatedUser.username,
-                    fullname: updatedUser.fullname,
-                    img: updatedUser.img,
-                    titles: updatedUser.titles,
-                    points: updatedUser.points,
-                    winCount: updatedUser.winCount,
+                    notificationId: populatedNotification._id.toString(),
+                    userId: populatedNotification.userId._id.toString(),
+                    username: populatedNotification.userId.username,
+                    fullname: populatedNotification.userId.fullname,
+                    img: populatedNotification.userId.img,
+                    titles: populatedNotification.userId.titles,
+                    points: populatedNotification.userId.points,
+                    winCount: populatedNotification.userId.winCount,
                     pointsAwarded,
-                    awardedAt: rewardNotification.createdAt
+                    eventTitle,
+                    eventId: eventId ? eventId.toString() : null,
+                    awardedAt: populatedNotification.createdAt
+                },
+                room: 'rewardFeed'
+            });
+
+            // Lưu vào LotteryRegistration cho LotteryRegistrationFeed
+            const lotteryRegistration = new LotteryRegistration({
+                userId: id,
+                type: 'USER_REWARDED',
+                content: `Người dùng ${user.fullname} đã được phát thưởng ${pointsAwarded} điểm cho sự kiện ${eventTitle}!`,
+                createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+                eventId: eventId ? new mongoose.Types.ObjectId(eventId) : null,
+                isReward: true,
+                pointsAwarded
+            });
+            await lotteryRegistration.save();
+
+            const populatedLotteryRegistration = await LotteryRegistration.findById(lotteryRegistration._id)
+                .populate('userId', 'username fullname img titles points winCount')
+                .populate('eventId', 'title')
+                .lean();
+
+            console.log('Broadcasting USER_REWARDED:', {
+                room: 'lotteryFeed', data: {
+                    registrationId: populatedLotteryRegistration._id.toString(),
+                    userId: populatedLotteryRegistration.userId._id.toString(),
+                    pointsAwarded,
+                    eventTitle
+                }
+            });
+            broadcastComment({
+                type: 'USER_REWARDED',
+                data: {
+                    registrationId: populatedLotteryRegistration._id.toString(),
+                    userId: populatedLotteryRegistration.userId._id.toString(),
+                    username: populatedLotteryRegistration.userId.username,
+                    fullname: populatedLotteryRegistration.userId.fullname,
+                    img: populatedLotteryRegistration.userId.img,
+                    titles: populatedLotteryRegistration.userId.titles,
+                    points: populatedLotteryRegistration.userId.points,
+                    winCount: populatedLotteryRegistration.userId.winCount,
+                    pointsAwarded,
+                    eventTitle,
+                    eventId: eventId ? eventId.toString() : null,
+                    awardedAt: populatedLotteryRegistration.createdAt
                 },
                 room: 'lotteryFeed'
             });
@@ -236,15 +302,15 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
         res.status(200).json({ message: "Cập nhật thông tin người dùng thành công", user: updatedUser });
     } catch (error) {
         console.error("Error in /users/:id:", error.message);
-        res.status(500).json({ error: "Không thể cập nhật người dùng" });
+        res.status(500).json({ error: "Không thể cập nhật người dùng", details: error.message });
     }
 });
 
 router.post("/reward", authenticate, isAdmin, async (req, res) => {
     try {
-        const { userId, points } = req.body;
-        if (!userId || !points || points <= 0) {
-            return res.status(400).json({ error: "Cần cung cấp userId và số điểm hợp lệ" });
+        const { userId, points, eventTitle, eventId } = req.body;
+        if (!userId || !points || points <= 0 || !eventTitle) {
+            return res.status(400).json({ error: "Cần cung cấp userId, points, và eventTitle hợp lệ" });
         }
         const user = await userModel.findById(userId);
         if (!user) {
@@ -253,54 +319,112 @@ router.post("/reward", authenticate, isAdmin, async (req, res) => {
         user.points = (user.points || 0) + points;
         const updatedUser = await user.save();
 
-        // Lưu thông báo phát thưởng
-        const rewardNotification = new LotteryRegistration({
+        // Lưu vào Notification cho UserAvatar
+        const notification = new Notification({
             userId,
-            isReward: true,
-            pointsAwarded: points,
-            createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate()
+            type: 'USER_REWARDED',
+            content: `Bạn đã được phát thưởng ${points} điểm cho sự kiện ${eventTitle}!`,
+            isRead: false,
+            createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+            eventId: eventId ? new mongoose.Types.ObjectId(eventId) : null
         });
-        await rewardNotification.save();
+        await notification.save();
+
+        const populatedNotification = await Notification.findById(notification._id)
+            .populate('userId', 'username fullname img titles points winCount')
+            .populate('eventId', 'title')
+            .lean();
 
         // Phát thông báo USER_UPDATED
+        const userUpdateData = {
+            _id: updatedUser._id,
+            points: updatedUser.points,
+            titles: updatedUser.titles,
+            winCount: updatedUser.winCount,
+            img: updatedUser.img,
+            fullname: updatedUser.fullname
+        };
+        console.log('Broadcasting USER_UPDATED:', { room: 'leaderboard', data: userUpdateData });
         broadcastComment({
             type: 'USER_UPDATED',
-            data: {
-                _id: updatedUser._id,
-                points: updatedUser.points,
-                titles: updatedUser.titles,
-                winCount: updatedUser.winCount,
-                img: updatedUser.img,
-                fullname: updatedUser.fullname
-            },
+            data: userUpdateData,
             room: 'leaderboard'
         });
+        console.log('Broadcasting USER_UPDATED:', { room: 'lotteryFeed', data: userUpdateData });
         broadcastComment({
             type: 'USER_UPDATED',
-            data: {
-                _id: updatedUser._id,
-                points: updatedUser.points,
-                titles: updatedUser.titles,
-                winCount: updatedUser.winCount,
-                img: updatedUser.img,
-                fullname: updatedUser.fullname
-            },
+            data: userUpdateData,
             room: 'lotteryFeed'
         });
 
-        // Phát thông báo USER_REWARDED
+        // Phát thông báo USER_REWARDED cho UserAvatar
+        console.log('Broadcasting USER_REWARDED:', {
+            room: 'rewardFeed', data: {
+                notificationId: populatedNotification._id.toString(),
+                userId: populatedNotification.userId._id.toString(),
+                pointsAwarded: points,
+                eventTitle
+            }
+        });
         broadcastComment({
             type: 'USER_REWARDED',
             data: {
-                userId: updatedUser._id,
-                username: updatedUser.username,
-                fullname: updatedUser.fullname,
-                img: updatedUser.img,
-                titles: updatedUser.titles,
-                points: updatedUser.points,
-                winCount: updatedUser.winCount,
+                notificationId: populatedNotification._id.toString(),
+                userId: populatedNotification.userId._id.toString(),
+                username: populatedNotification.userId.username,
+                fullname: populatedNotification.userId.fullname,
+                img: populatedNotification.userId.img,
+                titles: populatedNotification.userId.titles,
+                points: populatedNotification.userId.points,
+                winCount: populatedNotification.userId.winCount,
                 pointsAwarded: points,
-                awardedAt: rewardNotification.createdAt
+                eventTitle,
+                eventId: eventId ? eventId.toString() : null,
+                awardedAt: populatedNotification.createdAt
+            },
+            room: 'rewardFeed'
+        });
+
+        // Lưu vào LotteryRegistration cho LotteryRegistrationFeed
+        const lotteryRegistration = new LotteryRegistration({
+            userId,
+            type: 'USER_REWARDED',
+            content: `Người dùng ${user.fullname} đã được phát thưởng ${points} điểm cho sự kiện ${eventTitle}!`,
+            createdAt: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+            eventId: eventId ? new mongoose.Types.ObjectId(eventId) : null,
+            isReward: true,
+            pointsAwarded: points
+        });
+        await lotteryRegistration.save();
+
+        const populatedLotteryRegistration = await LotteryRegistration.findById(lotteryRegistration._id)
+            .populate('userId', 'username fullname img titles points winCount')
+            .populate('eventId', 'title')
+            .lean();
+
+        console.log('Broadcasting USER_REWARDED:', {
+            room: 'lotteryFeed', data: {
+                registrationId: populatedLotteryRegistration._id.toString(),
+                userId: populatedLotteryRegistration.userId._id.toString(),
+                pointsAwarded: points,
+                eventTitle
+            }
+        });
+        broadcastComment({
+            type: 'USER_REWARDED',
+            data: {
+                registrationId: populatedLotteryRegistration._id.toString(),
+                userId: populatedLotteryRegistration.userId._id.toString(),
+                username: populatedLotteryRegistration.userId.username,
+                fullname: populatedLotteryRegistration.userId.fullname,
+                img: populatedLotteryRegistration.userId.img,
+                titles: populatedLotteryRegistration.userId.titles,
+                points: populatedLotteryRegistration.userId.points,
+                winCount: populatedLotteryRegistration.userId.winCount,
+                pointsAwarded: points,
+                eventTitle,
+                eventId: eventId ? eventId.toString() : null,
+                awardedAt: populatedLotteryRegistration.createdAt
             },
             room: 'lotteryFeed'
         });
@@ -349,7 +473,7 @@ router.post("/upload-avatar", authenticate, upload.single('avatar'), async (req,
                     folder: 'avatars',
                     public_id: `${req.user.id || req.user.userId}_${Date.now()}`,
                     resource_type: 'image',
-                    transformation: [{ width: 200, height: 200, crop: 'fill', quality: 'auto', fetch_format: 'auto' }],
+                    transformation: [{ width: 200, height: 200, crop: 'fill' }]
                 },
                 (error, result) => {
                     if (error) reject(error);
@@ -358,16 +482,16 @@ router.post("/upload-avatar", authenticate, upload.single('avatar'), async (req,
             );
             bufferStream.pipe(uploadStream);
         });
-        console.log('Cloudinary upload result:', {
-            secure_url: result.secure_url,
-            public_id: result.public_id,
-        });
-        const user = await userModel
-            .findByIdAndUpdate(req.user.id || req.user.userId, { img: result.secure_url }, { new: true })
-            .select("-password -refreshTokens");
+
+        const userId = req.user.id || req.user.userId;
+        const user = await userModel.findById(userId);
         if (!user) {
             return res.status(404).json({ error: "Người dùng không tồn tại" });
         }
+        user.img = result.secure_url;
+        await user.save();
+
+        // Phát thông báo USER_UPDATED
         const userUpdateData = {
             _id: user._id,
             points: user.points,
@@ -376,16 +500,19 @@ router.post("/upload-avatar", authenticate, upload.single('avatar'), async (req,
             img: user.img,
             fullname: user.fullname
         };
+        console.log('Broadcasting USER_UPDATED:', { room: 'leaderboard', data: userUpdateData });
         broadcastComment({
             type: 'USER_UPDATED',
             data: userUpdateData,
             room: 'leaderboard'
         });
+        console.log('Broadcasting USER_UPDATED:', { room: 'lotteryFeed', data: userUpdateData });
         broadcastComment({
             type: 'USER_UPDATED',
             data: userUpdateData,
             room: 'lotteryFeed'
         });
+
         res.status(200).json({ message: "Tải ảnh đại diện thành công", user });
     } catch (error) {
         console.error("Error uploading avatar to Cloudinary:", error.message);

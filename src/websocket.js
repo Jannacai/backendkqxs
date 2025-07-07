@@ -18,7 +18,6 @@ function initializeWebSocket(server) {
     });
 
     io.on("connection", (socket) => {
-        // Tự động tham gia phòng public khi kết nối
         socket.join("public");
         console.log(`Socket.IO client connected: Client ID: ${socket.id}`);
 
@@ -52,12 +51,34 @@ function initializeWebSocket(server) {
             console.log(`Client ${socket.id} joined room event:${eventId}`);
         });
 
+        socket.on("joinRewardFeed", () => {
+            socket.join("rewardFeed");
+            console.log(`Client ${socket.id} joined rewardFeed room`);
+        });
+
+        socket.on("joinRoom", (room) => {
+            socket.join(room);
+            console.log(`Client ${socket.id} joined room ${room}`);
+            io.in(room).allSockets().then(clients => {
+                console.log(`Clients in room ${room}: `, Array.from(clients));
+            });
+        });
+
+        // Thêm joinPrivateRoom để hỗ trợ chat 1:1
+        socket.on("joinPrivateRoom", (roomId) => {
+            socket.join(roomId);
+            console.log(`Client ${socket.id} joined private room ${roomId}`);
+            io.in(roomId).allSockets().then(clients => {
+                console.log(`Clients in private room ${roomId}: `, Array.from(clients));
+            });
+        });
+
         socket.on("disconnect", () => {
             console.log(`Socket.IO client disconnected: ${socket.id}`);
         });
 
         socket.on("error", (error) => {
-            console.error(`Socket.IO error for client ${socket.id}:`, error.message);
+            console.error(`Socket.IO error for client ${socket.id}: `, error.message);
         });
     });
 
@@ -70,7 +91,7 @@ function broadcastComment({ type, data, room, postId, eventId }) {
         return;
     }
     if (room) {
-        io.to(room).emit(type, data);
+        io.to(room).emit(type, { ...data, roomId: room }); // Thêm roomId vào data để frontend kiểm tra
         console.log(`Broadcasted ${type} to room ${room}`);
     } else if (postId) {
         io.to(`post:${postId}`).emit(type, data);
@@ -79,7 +100,7 @@ function broadcastComment({ type, data, room, postId, eventId }) {
         io.to(`event:${eventId}`).emit(type, data);
         console.log(`Broadcasted ${type} to room event:${eventId}`);
     } else {
-        io.to("public").emit(type, data); // Sử dụng phòng public thay vì chat
+        io.to("public").emit(type, data);
         console.log(`Broadcasted ${type} to public room`);
     }
 }
