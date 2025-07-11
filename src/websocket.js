@@ -1,8 +1,13 @@
 "use strict";
 
 const { Server } = require("socket.io");
+const mongoose = require('mongoose');
+// const userModel = require("./models/users.models");
+const jwt = require('jsonwebtoken');
+const moment = require('moment-timezone');
 
 let io = null;
+let guestCount = 0; // Biến đếm số khách online
 
 function initializeWebSocket(server) {
     if (io) {
@@ -17,9 +22,49 @@ function initializeWebSocket(server) {
         },
     });
 
-    io.on("connection", (socket) => {
+    io.on("connection", async (socket) => {
+        // Xác thực userId từ token
+        const token = socket.handshake.query.token;
+        let userId = null;
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+            userId = decoded.userId || decoded.id;
+            if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+                // Cập nhật trạng thái online và socketId cho người dùng đăng nhập
+                await userModel.findByIdAndUpdate(userId, {
+                    isOnline: true,
+                    lastActive: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+                    socketId: socket.id,
+                });
+                io.to('userStatus').emit('USER_STATUS_UPDATED', {
+                    _id: userId,
+                    isOnline: true,
+                    lastActive: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+                });
+                console.log(`User ${userId} is online with socket ${socket.id}`);
+            } else {
+                // Không có userId hợp lệ, coi là khách
+                guestCount++;
+                io.to('userStatus').emit('GUEST_COUNT_UPDATED', { guestCount });
+                console.log(`Guest connected, total guests: ${guestCount}`);
+            }
+        } catch (err) {
+            // Token không hợp lệ, coi là khách
+            guestCount++;
+            io.to('userStatus').emit('GUEST_COUNT_UPDATED', { guestCount });
+            console.log(`Guest connected (invalid token), total guests: ${guestCount}`);
+        }
+
         socket.join("public");
         console.log(`Socket.IO client connected: Client ID: ${socket.id}`);
+
+        // Kênh userStatus cho UserList
+        socket.on("joinUserStatus", () => {
+            socket.join("userStatus");
+            console.log(`Client ${socket.id} joined userStatus room`);
+            // Gửi số lượng khách online cho client mới
+            socket.emit('GUEST_COUNT_UPDATED', { guestCount });
+        });
 
         socket.on("joinChat", () => {
             socket.join("chat");
@@ -64,7 +109,6 @@ function initializeWebSocket(server) {
             });
         });
 
-        // Thêm joinPrivateRoom để hỗ trợ chat 1:1
         socket.on("joinPrivateRoom", (roomId) => {
             socket.join(roomId);
             console.log(`Client ${socket.id} joined private room ${roomId}`);
@@ -73,7 +117,49 @@ function initializeWebSocket(server) {
             });
         });
 
-        socket.on("disconnect", () => {
+        // Xử lý tái kết nối
+        socket.on("reconnect", async () => {
+            if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+                await userModel.findByIdAndUpdate(userId, {
+                    isOnline: true,
+                    lastActive: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+                    socketId: socket.id,
+                });
+                io.to('userStatus').emit('USER_STATUS_UPDATED', {
+                    _id: userId,
+                    isOnline: true,
+                    lastActive: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+                });
+                console.log(`User ${userId} reconnected with socket ${socket.id}`);
+            }
+        });
+
+        // Xử lý ngắt kết nối
+        socket.on("disconnect", async () => {
+            if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+                // Đặt timeout 30 giây trước khi đánh dấu offline
+                setTimeout(async () => {
+                    const user = await userModel.findById(userId);
+                    if (user && user.socketId === socket.id) {
+                        await userModel.findByIdAndUpdate(userId, {
+                            isOnline: false,
+                            lastActive: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+                            socketId: null,
+                        });
+                        io.to('userStatus').emit('USER_STATUS_UPDATED', {
+                            _id: userId,
+                            isOnline: false,
+                            lastActive: moment.tz('Asia/Ho_Chi_Minh').toDate(),
+                        });
+                        console.log(`User ${userId} is offline after grace period`);
+                    }
+                }, 30000); // 30 giây grace period
+            } else {
+                // Khách ngắt kết nối
+                guestCount = Math.max(0, guestCount - 1);
+                io.to('userStatus').emit('GUEST_COUNT_UPDATED', { guestCount });
+                console.log(`Guest disconnected, total guests: ${guestCount}`);
+            }
             console.log(`Socket.IO client disconnected: ${socket.id}`);
         });
 
@@ -91,7 +177,7 @@ function broadcastComment({ type, data, room, postId, eventId }) {
         return;
     }
     if (room) {
-        io.to(room).emit(type, { ...data, roomId: room }); // Thêm roomId vào data để frontend kiểm tra
+        io.to(room).emit(type, { ...data, roomId: room });
         console.log(`Broadcasted ${type} to room ${room}`);
     } else if (postId) {
         io.to(`post:${postId}`).emit(type, data);
