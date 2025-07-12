@@ -26,8 +26,8 @@ const Routes = (app) => {
     // app.use('/api/events', eventRouter);
     app.use('/api/ketqua', resultsRouterMN);
     app.use('/api/ketquaxs', resultsRouterMT);
-    app.use('/api/kqxs', resultsRouterMB);
     app.use('/api/kqxs/xsmb/sse', xsmbLiveRoutes);
+    app.use('/api/kqxs', resultsRouterMB);
 
     // app.use('/api/posts', postsRouter);
     // app.use('/api/stats', statsRouter);

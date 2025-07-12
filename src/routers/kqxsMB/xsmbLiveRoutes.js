@@ -74,70 +74,6 @@ const sendToClients = async (channel, event, data) => {
 
     logger.info(`Gửi sự kiện ${event} tới ${channelClients?.size || 0} client trong kênh ${channel}, thời gian: ${Date.now() - start}ms`);
 };
-
-// Route lấy trạng thái ban đầu
-router.get('/initial', apiLimiter, async (req, res) => {
-    try {
-        const { date, station } = req.query;
-        const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
-            ? date
-            : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-
-        const redis = await getRedisClient();
-        let existingData = await redis.hGetAll(`kqxs:${targetDate}`);
-        const metadata = JSON.parse((await redis.hGet(`kqxs:${targetDate}:meta`, 'metadata')) || '{}');
-
-        const initialData = {
-            firstPrize_0: '...',
-            secondPrize_0: '...',
-            secondPrize_1: '...',
-            threePrizes_0: '...',
-            threePrizes_1: '...',
-            threePrizes_2: '...',
-            threePrizes_3: '...',
-            threePrizes_4: '...',
-            threePrizes_5: '...',
-            fourPrizes_0: '...',
-            fourPrizes_1: '...',
-            fourPrizes_2: '...',
-            fourPrizes_3: '...',
-            fivePrizes_0: '...',
-            fivePrizes_1: '...',
-            fivePrizes_2: '...',
-            fivePrizes_3: '...',
-            fivePrizes_4: '...',
-            fivePrizes_5: '...',
-            sixPrizes_0: '...',
-            sixPrizes_1: '...',
-            sixPrizes_2: '...',
-            sevenPrizes_0: '...',
-            sevenPrizes_1: '...',
-            sevenPrizes_2: '...',
-            sevenPrizes_3: '...',
-            maDB: '...',
-            specialPrize_0: '...',
-            drawDate: targetDate,
-            station: station || 'xsmb',
-            tentinh: metadata.tentinh || 'Miền Bắc',
-            tinh: metadata.tinh || 'MB',
-            year: metadata.year || new Date().getFullYear(),
-            month: metadata.month || new Date().getMonth() + 1,
-            dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
-        };
-
-        for (const [key, value] of Object.entries(existingData)) {
-            if (initialData[key]) {
-                initialData[key] = JSON.parse(value);
-            }
-        }
-
-        res.status(200).json(initialData);
-    } catch (error) {
-        logger.error('Lỗi khi lấy trạng thái ban đầu từ Redis:', error);
-        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
-    }
-});
-
 // Route xử lý SSE cho xổ số trực tiếp
 router.get('/', sseLimiter, async (req, res) => {
     try {
@@ -365,5 +301,69 @@ router.get('/', sseLimiter, async (req, res) => {
         res.status(500).end();
     }
 });
+// Route lấy trạng thái ban đầu
+router.get('/initial', apiLimiter, async (req, res) => {
+    try {
+        const { date, station } = req.query;
+        const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
+            ? date
+            : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+
+        const redis = await getRedisClient();
+        let existingData = await redis.hGetAll(`kqxs:${targetDate}`);
+        const metadata = JSON.parse((await redis.hGet(`kqxs:${targetDate}:meta`, 'metadata')) || '{}');
+
+        const initialData = {
+            firstPrize_0: '...',
+            secondPrize_0: '...',
+            secondPrize_1: '...',
+            threePrizes_0: '...',
+            threePrizes_1: '...',
+            threePrizes_2: '...',
+            threePrizes_3: '...',
+            threePrizes_4: '...',
+            threePrizes_5: '...',
+            fourPrizes_0: '...',
+            fourPrizes_1: '...',
+            fourPrizes_2: '...',
+            fourPrizes_3: '...',
+            fivePrizes_0: '...',
+            fivePrizes_1: '...',
+            fivePrizes_2: '...',
+            fivePrizes_3: '...',
+            fivePrizes_4: '...',
+            fivePrizes_5: '...',
+            sixPrizes_0: '...',
+            sixPrizes_1: '...',
+            sixPrizes_2: '...',
+            sevenPrizes_0: '...',
+            sevenPrizes_1: '...',
+            sevenPrizes_2: '...',
+            sevenPrizes_3: '...',
+            maDB: '...',
+            specialPrize_0: '...',
+            drawDate: targetDate,
+            station: station || 'xsmb',
+            tentinh: metadata.tentinh || 'Miền Bắc',
+            tinh: metadata.tinh || 'MB',
+            year: metadata.year || new Date().getFullYear(),
+            month: metadata.month || new Date().getMonth() + 1,
+            dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
+        };
+
+        for (const [key, value] of Object.entries(existingData)) {
+            if (initialData[key]) {
+                initialData[key] = JSON.parse(value);
+            }
+        }
+
+        res.status(200).json(initialData);
+    } catch (error) {
+        logger.error('Lỗi khi lấy trạng thái ban đầu từ Redis:', error);
+        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
+    }
+});
+
+
 
 module.exports = router;
