@@ -6,6 +6,8 @@
 // const groupchatRoutes = require('./auth/groupchat.routes');
 // const lotteryRoutes = require('./lottery/lottery');
 const resultsRouterMB = require('./kqxsMB/resultMB.routes');
+const xsmbLiveRoutes = require('./kqxsMB/xsmbLiveRoutes');
+
 const resultsRouterMN = require('./kqxsMN/resultMN.routes');
 const resultsRouterMT = require('./kqxsMT/resultMT.routes');
 // const postsRouter = require('./post/post.routes');
@@ -24,7 +26,9 @@ const Routes = (app) => {
     // app.use('/api/events', eventRouter);
     app.use('/api/ketqua', resultsRouterMN);
     app.use('/api/ketquaxs', resultsRouterMT);
+    app.use('/api/kqxs/xsmb/sse', xsmbLiveRoutes);
     app.use('/api/kqxs', resultsRouterMB);
+
     // app.use('/api/posts', postsRouter);
     // app.use('/api/stats', statsRouter);
     app.use('/api/taodan', calculate3D4D);
