@@ -359,8 +359,6 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
     }
 });
 
-
-
 // Route lấy kết quả xổ số trong khoảng thời gian
 router.get('/xsmb/range', statsLimiter, async (req, res) => {
     try {
