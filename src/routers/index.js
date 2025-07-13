@@ -7,6 +7,7 @@
 // const lotteryRoutes = require('./lottery/lottery');
 const resultsRouterMB = require('./kqxsMB/resultMB.routes');
 const LiveRouterMB = require('./kqxsMB/xsmbLiveRoutes');
+const soicauRouterMB = require('./kqxsMB/soicau.routes');
 
 const resultsRouterMN = require('./kqxsMN/resultMN.routes');
 const resultsRouterMT = require('./kqxsMT/resultMT.routes');
@@ -28,6 +29,8 @@ const Routes = (app) => {
     app.use('/api/ketquaxs', resultsRouterMT);
     app.use('/api/kqxs/xsmb/sse', LiveRouterMB);
     app.use('/api/kqxs', resultsRouterMB);
+    app.use('/api/kqxs/xsmb/soicau', soicauRouterMB);
+
 
     // app.use('/api/posts', postsRouter);
     // app.use('/api/stats', statsRouter);

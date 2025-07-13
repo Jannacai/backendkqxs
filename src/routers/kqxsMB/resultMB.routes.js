@@ -2,14 +2,13 @@ const express = require('express');
 const router = express.Router();
 const XSMB = require('../../models/XS_MB.models');
 const { getLoGanStats, getSpecialPrizeStats, getDauDuoiStats, getDauDuoiStatsByDate, getSpecialPrizeStatsByWeek, getTanSuatLotoStats, getTanSuatLoCapStats } = require('../../controllers/xsmbController');
-const { getBachThuMB } = require('../../controllers/soiCauMBController.js');
 const rateLimit = require('express-rate-limit');
 const redis = require('redis');
 const cron = require('node-cron');
 
-// bot telegram
+// Bot Telegram
 const TelegramBot = require('node-telegram-bot-api');
-const token = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN'; // Dùng biến môi trường hoặc hardcode tạm
+const token = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN';
 const bot = new TelegramBot(token);
 
 // Kết nối Redis
@@ -82,9 +81,7 @@ const statsLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 100,
     message: 'Quá nhiều yêu cầu thống kê, vui lòng thử lại sau',
-    keyGenerator: (req) => {
-        return req.headers['x-user-id'] || req.ip;
-    },
+    keyGenerator: (req) => req.headers['x-user-id'] || req.ip,
 });
 
 const mapDayOfWeek = (dayOfWeekNoAccent) => {
@@ -114,7 +111,6 @@ router.get('/xsmb/range', statsLimiter, async (req, res) => {
             return res.status(400).json({ error: 'startDate phải nhỏ hơn hoặc bằng endDate.' });
         }
 
-        // Giới hạn khoảng thời gian tối đa 30 ngày để tránh tải nặng
         const maxDays = 30;
         const diffDays = Math.ceil((parsedEndDate - parsedStartDate) / (1000 * 60 * 60 * 24));
         if (diffDays > maxDays) {
@@ -151,77 +147,7 @@ router.get('/xsmb/range', statsLimiter, async (req, res) => {
     }
 });
 
-// Route lấy kết quả soi cầu bạch thủ trong khoảng thời gian
-router.get('/xsmb/soicau/bach-thu/range', statsLimiter, async (req, res) => {
-    try {
-        const { startDate, endDate, days } = req.query;
-        if (!startDate || !endDate || !days) {
-            return res.status(400).json({ error: 'Vui lòng cung cấp startDate, endDate và days.' });
-        }
-
-        const validDays = [3, 5, 7, 10, 14];
-        const numDays = parseInt(days);
-        if (!validDays.includes(numDays)) {
-            return res.status(400).json({ error: 'Số ngày không hợp lệ. Chỉ chấp nhận: 3, 5, 7, 10, 14.' });
-        }
-
-        const parsedStartDate = parseDate(startDate);
-        const parsedEndDate = parseDate(endDate);
-        if (parsedStartDate > parsedEndDate) {
-            return res.status(400).json({ error: 'startDate phải nhỏ hơn hoặc bằng endDate.' });
-        }
-
-        // Giới hạn khoảng thời gian tối đa 7 ngày để tối ưu hiệu suất
-        const maxDays = 7;
-        const diffDays = Math.ceil((parsedEndDate - parsedStartDate) / (1000 * 60 * 60 * 24));
-        if (diffDays > maxDays) {
-            return res.status(400).json({ error: `Khoảng thời gian không được vượt quá ${maxDays} ngày.` });
-        }
-
-        const cacheKey = `bachthu:range:${startDate}:${endDate}:days:${numDays}`;
-        const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-
-        const results = [];
-        let currentDate = new Date(parsedStartDate);
-        while (currentDate <= parsedEndDate) {
-            const formattedDate = currentDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-            try {
-                const reqMock = { query: { date: formattedDate, days: numDays } };
-                const resMock = {
-                    status: (code) => ({
-                        json: (data) => {
-                            if (code === 200) results.push(data);
-                            else console.warn(`Không lấy được soi cầu cho ngày ${formattedDate}:`, data);
-                        },
-                    }),
-                };
-                await getBachThuMB(reqMock, resMock);
-            } catch (err) {
-                console.warn(`Lỗi khi lấy soi cầu cho ngày ${formattedDate}:`, err.message);
-            }
-            currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        if (!results.length) {
-            return res.status(404).json({ error: `Không tìm thấy dữ liệu soi cầu từ ${startDate} đến ${endDate}.` });
-        }
-
-        await redisClient.setEx(cacheKey, 86400, JSON.stringify(results));
-        res.status(200).json(results);
-    } catch (error) {
-        console.error('Lỗi khi lấy soi cầu bạch thủ trong khoảng thời gian:', error);
-        if (error.message.includes('không hợp lệ')) {
-            res.status(400).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
-        }
-    }
-});
-
-// Các route hiện có
+// Các route KQXS cơ bản
 router.get('/', apiLimiter, async (req, res) => {
     try {
         const { limit = 30 } = req.query;
@@ -332,7 +258,6 @@ router.get('/xsmb/:dayOfWeek', apiLimiter, async (req, res) => {
     }
 });
 
-// Danh sách KQXS theo tỉnh (trả về bản ghi theo tỉnh)
 router.get('/xsmb/tinh/:tinh', apiLimiter, async (req, res) => {
     const { tinh } = req.params;
     try {
@@ -361,6 +286,7 @@ router.get('/xsmb/tinh/:tinh', apiLimiter, async (req, res) => {
     }
 });
 
+// Các route thống kê
 router.get('/xsmb/statistics/gan', statsLimiter, async (req, res) => {
     req.query.station = 'xsmb';
     await getLoGanStats(req, res);
@@ -396,10 +322,7 @@ router.get('/xsmb/statistics/tan-suat-lo-cap', statsLimiter, async (req, res) =>
     await getTanSuatLoCapStats(req, res);
 });
 
-router.get('/xsmb/soicau/soi-cau-bach-thu', statsLimiter, async (req, res) => {
-    await getBachThuMB(req, res);
-});
-
+// Route Telegram
 router.post('/telegram', async (req, res) => {
     try {
         const update = req.body;
@@ -413,9 +336,8 @@ router.post('/telegram', async (req, res) => {
         if (text === '/start') {
             await bot.sendMessage(chatId, 'Chào bạn! Gõ /xsmb để xem kết quả xổ số miền Bắc.');
         } else if (text === '/xsmb') {
-            // Gọi API /xsmb
             const response = await fetch('https://xsmb.win/xsmb', {
-                headers: { 'x-user-id': 'bot' }, // Thêm header để qua rate limiter
+                headers: { 'x-user-id': 'bot' },
             });
             const data = await response.json();
             if (response.status !== 200) {
@@ -423,9 +345,8 @@ router.post('/telegram', async (req, res) => {
                 return res.status(200).end();
             }
 
-            // Lấy kết quả mới nhất
             const latestResult = data[0];
-            const resultText = `Kết quả XSMB ngày ${latestResult.drawDate.toLocaleDateString('vi-VN')}:\n` +
+            const resultText = `Kết quả XSMB ngày ${new Date(latestResult.drawDate).toLocaleDateString('vi-VN')}:\n` +
                 `Đặc biệt: ${latestResult.specialPrize_0 || 'Chưa có'}\n` +
                 `Giải nhất: ${latestResult.firstPrize_0 || 'Chưa có'}`;
             await bot.sendMessage(chatId, resultText);
@@ -441,4 +362,3 @@ router.post('/telegram', async (req, res) => {
 });
 
 module.exports = router;
-//  cần test thử(21/06)
