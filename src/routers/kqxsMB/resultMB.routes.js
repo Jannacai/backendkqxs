@@ -6,10 +6,9 @@ const { getBachThuMB } = require('../../controllers/soiCauMBController.js');
 const rateLimit = require('express-rate-limit');
 const redis = require('redis');
 const cron = require('node-cron');
-
-// bot telegram
 const TelegramBot = require('node-telegram-bot-api');
-const token = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN'; // Dùng biến môi trường hoặc hardcode tạm
+
+const token = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN';
 const bot = new TelegramBot(token);
 
 // Kết nối Redis
@@ -30,7 +29,7 @@ const parseDate = (dateStr) => {
     return new Date(year, month - 1, day);
 };
 
-// Tính toán trước dữ liệu thống kê (chạy lúc 18:30 mỗi ngày)
+// Tính toán trước dữ liệu thống kê (chạy lúc 18:40 mỗi ngày)
 cron.schedule('40 18 * * *', async () => {
     console.log('Tính toán trước thống kê lô gan...');
     const daysOptions = [6, 7, 14, 30, 60];
@@ -100,6 +99,316 @@ const mapDayOfWeek = (dayOfWeekNoAccent) => {
     return dayMap[dayOfWeekNoAccent.toLowerCase()] || dayOfWeekNoAccent;
 };
 
+// Route lấy tổng số bản ghi
+router.get('/xsmb/total-records', apiLimiter, async (req, res) => {
+    try {
+        const { date, dayOfWeek, station = 'xsmb' } = req.query;
+        const query = { station };
+        if (date && /^\d{2}-\d{2}-\d{4}$/.test(date)) {
+            query.drawDate = parseDate(date);
+        }
+        if (dayOfWeek) {
+            const mappedDayOfWeek = mapDayOfWeek(dayOfWeek);
+            query.dayOfWeek = mappedDayOfWeek;
+        }
+
+        const cacheKey = `kqxs:total:xsmb:${date || 'all'}:${dayOfWeek || 'all'}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        const total = await XSMB.countDocuments(query);
+        await redisClient.setEx(cacheKey, 60, JSON.stringify({ total }));
+        res.status(200).json({ total });
+    } catch (error) {
+        console.error('Lỗi khi lấy tổng số bản ghi:', error);
+        if (error.message.includes('không hợp lệ')) {
+            res.status(400).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
+        }
+    }
+});
+
+// Route lấy kết quả xổ số với phân trang
+router.get('/xsmb', apiLimiter, async (req, res) => {
+    try {
+        const { date, dayOfWeek, page = 1, limit = 3 } = req.query;
+        const query = { station: 'xsmb' };
+        if (date && /^\d{2}-\d{2}-\d{4}$/.test(date)) {
+            query.drawDate = parseDate(date);
+        }
+        if (dayOfWeek) {
+            const mappedDayOfWeek = mapDayOfWeek(dayOfWeek);
+            query.dayOfWeek = mappedDayOfWeek;
+        }
+
+        const cacheKey = `kqxs:xsmb:${date || 'all'}:${dayOfWeek || 'all'}:${page}:${limit}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const results = await XSMB.find(query)
+            .lean()
+            .sort({ drawDate: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        if (!results.length) {
+            return res.status(404).json({ error: `Không tìm thấy dữ liệu cho xsmb, date: ${date || 'all'}, dayOfWeek: ${dayOfWeek || 'all'}` });
+        }
+
+        await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
+        res.status(200).json(results);
+    } catch (error) {
+        console.error('Lỗi khi lấy KQXS xsmb:', error);
+        if (error.message.includes('không hợp lệ')) {
+            res.status(400).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
+        }
+    }
+});
+
+// Route lấy kết quả xổ số theo slug
+router.get('/:slug', apiLimiter, async (req, res) => {
+    const { slug } = req.params;
+    try {
+        if (!slug || slug.trim() === '') {
+            return res.status(400).json({ error: 'Slug không được để trống' });
+        }
+        const cacheKey = `kqxs:slug:${slug}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        const result = await XSMB.findOne({ slug })
+            .lean()
+            .sort({ drawDate: -1 });
+        if (!result) {
+            return res.status(404).json({ error: 'Không tìm thấy kết quả' });
+        }
+        await redisClient.setEx(cacheKey, 60, JSON.stringify(result));
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Lỗi khi lấy KQXS theo slug:', error);
+        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
+    }
+});
+
+// Route lấy kết quả xổ số theo thứ
+router.get('/xsmb/:dayOfWeek', apiLimiter, async (req, res) => {
+    const { dayOfWeek } = req.params;
+    try {
+        if (!dayOfWeek || dayOfWeek.trim() === '') {
+            return res.status(400).json({ error: 'Thứ không được để trống' });
+        }
+
+        const cacheKey = `kqxs:day:${dayOfWeek}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        const mappedDayOfWeek = mapDayOfWeek(dayOfWeek);
+        const results = await XSMB.find({
+            station: 'xsmb',
+            dayOfWeek: mappedDayOfWeek,
+        })
+            .lean()
+            .sort({ drawDate: -1 })
+            .limit(30);
+        if (!results || results.length === 0) {
+            return res.status(404).json({ error: `Không tìm thấy kết quả cho ${mappedDayOfWeek}` });
+        }
+        await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
+        res.status(200).json(results);
+    } catch (error) {
+        console.error('Lỗi khi lấy KQXS theo thứ:', error);
+        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
+    }
+});
+
+// Route lấy kết quả xổ số theo tỉnh
+router.get('/xsmb/tinh/:tinh', apiLimiter, async (req, res) => {
+    const { tinh } = req.params;
+    try {
+        if (!tinh || tinh.trim() === '') {
+            return res.status(400).json({ error: 'Tinh cannot be empty' });
+        }
+
+        const cacheKey = `kqxs:xsmb:tinh:${tinh}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        const result = await XSMB.find({ tinh }).lean()
+            .sort({ drawDate: -1 });
+
+        if (!result || result.length === 0) {
+            return res.status(404).json({ error: 'Result not found' });
+        }
+
+        await redisClient.setEx(cacheKey, 60, JSON.stringify(result));
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Lỗi lấy KQXS theo tỉnh:', error.message);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Route lấy kết quả xổ số trong khoảng thời gian
+router.get('/xsmb/range', statsLimiter, async (req, res) => {
+    try {
+        const { startDate, endDate, limit = 30 } = req.query;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Vui lòng cung cấp startDate và endDate.' });
+        }
+
+        const parsedStartDate = parseDate(startDate);
+        const parsedEndDate = parseDate(endDate);
+        if (parsedStartDate > parsedEndDate) {
+            return res.status(400).json({ error: 'startDate phải nhỏ hơn hoặc bằng endDate.' });
+        }
+
+        const maxDays = 30;
+        const diffDays = Math.ceil((parsedEndDate - parsedStartDate) / (1000 * 60 * 60 * 24));
+        if (diffDays > maxDays) {
+            return res.status(400).json({ error: `Khoảng thời gian không được vượt quá ${maxDays} ngày.` });
+        }
+
+        const cacheKey = `kqxs:range:xsmb:${startDate}:${endDate}:${limit}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        const results = await XSMB.find({
+            station: 'xsmb',
+            drawDate: { $gte: parsedStartDate, $lte: parsedEndDate },
+        })
+            .lean()
+            .sort({ drawDate: -1 })
+            .limit(parseInt(limit));
+
+        if (!results.length) {
+            return res.status(404).json({ error: `Không tìm thấy dữ liệu XSMB từ ${startDate} đến ${endDate}.` });
+        }
+
+        await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
+        res.status(200).json(results);
+    } catch (error) {
+        console.error('Lỗi khi lấy KQXS trong khoảng thời gian:', error);
+        if (error.message.includes('không hợp lệ')) {
+            res.status(400).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
+        }
+    }
+});
+
+// Route lấy kết quả soi cầu bạch thủ trong khoảng thời gian
+router.get('/xsmb/soicau/bach-thu/range', statsLimiter, async (req, res) => {
+    try {
+        const { startDate, endDate, days } = req.query;
+        if (!startDate || !endDate || !days) {
+            return res.status(400).json({ error: 'Vui lòng cung cấp startDate, endDate và days.' });
+        }
+
+        const validDays = [3, 5, 7, 10, 14];
+        const numDays = parseInt(days);
+        if (!validDays.includes(numDays)) {
+            return res.status(400).json({ error: 'Số ngày không hợp lệ. Chỉ chấp nhận: 3, 5, 7, 10, 14.' });
+        }
+
+        const parsedStartDate = parseDate(startDate);
+        const parsedEndDate = parseDate(endDate);
+        if (parsedStartDate > parsedEndDate) {
+            return res.status(400).json({ error: 'startDate phải nhỏ hơn hoặc bằng endDate.' });
+        }
+
+        const maxDays = 7;
+        const diffDays = Math.ceil((parsedEndDate - parsedStartDate) / (1000 * 60 * 60 * 24));
+        if (diffDays > maxDays) {
+            return res.status(400).json({ error: `Khoảng thời gian không được vượt quá ${maxDays} ngày.` });
+        }
+
+        const cacheKey = `bachthu:range:${startDate}:${endDate}:days:${numDays}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        const results = [];
+        let currentDate = new Date(parsedStartDate);
+        while (currentDate <= parsedEndDate) {
+            const formattedDate = currentDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+            try {
+                const reqMock = { query: { date: formattedDate, days: numDays } };
+                const resMock = {
+                    status: (code) => ({
+                        json: (data) => {
+                            if (code === 200) results.push(data);
+                            else console.warn(`Không lấy được soi cầu cho ngày ${formattedDate}:`, data);
+                        },
+                    }),
+                };
+                await getBachThuMB(reqMock, resMock);
+            } catch (err) {
+                console.warn(`Lỗi khi lấy soi cầu cho ngày ${formattedDate}:`, err.message);
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        if (!results.length) {
+            return res.status(404).json({ error: `Không tìm thấy dữ liệu soi cầu từ ${startDate} đến ${endDate}.` });
+        }
+
+        await redisClient.setEx(cacheKey, 86400, JSON.stringify(results));
+        res.status(200).json(results);
+    } catch (error) {
+        console.error('Lỗi khi lấy soi cầu bạch thủ trong khoảng thời gian:', error);
+        if (error.message.includes('không hợp lệ')) {
+            res.status(400).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
+        }
+    }
+});
+
+// Route lấy tất cả KQXS
+router.get('/', apiLimiter, async (req, res) => {
+    try {
+        const { limit = 30 } = req.query;
+        const cacheKey = `kqxs:all:${limit}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        const results = await XSMB.find()
+            .lean()
+            .sort({ drawDate: -1 })
+            .limit(parseInt(limit));
+
+        if (!results.length) {
+            return res.status(404).json({ error: 'Không tìm thấy dữ liệu KQXS' });
+        }
+
+        await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
+        res.status(200).json(results);
+    } catch (error) {
+        console.error('Lỗi khi lấy tất cả KQXS:', error);
+        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
+    }
+});
+
+// Route SSE initial
 router.get('/xsmb/sse/initial', apiLimiter, async (req, res) => {
     try {
         const { date, station } = req.query;
@@ -107,11 +416,9 @@ router.get('/xsmb/sse/initial', apiLimiter, async (req, res) => {
             ? date
             : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
 
-        // Lấy dữ liệu từ Redis
         let existingData = await redisClient.hGetAll(`kqxs:${targetDate}`);
         const metadata = JSON.parse((await redisClient.hGet(`kqxs:${targetDate}:meta`, 'metadata')) || '{}');
 
-        // Khởi tạo dữ liệu mặc định
         const initialData = {
             firstPrize_0: '...',
             secondPrize_0: '...',
@@ -130,7 +437,7 @@ router.get('/xsmb/sse/initial', apiLimiter, async (req, res) => {
             fivePrizes_1: '...',
             fivePrizes_2: '...',
             fivePrizes_3: '...',
-            fivePrizes_4: '...',
+            fourPrizes_4: '...',
             fivePrizes_5: '...',
             sixPrizes_0: '...',
             sixPrizes_1: '...',
@@ -150,7 +457,6 @@ router.get('/xsmb/sse/initial', apiLimiter, async (req, res) => {
             dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
         };
 
-        // Cập nhật dữ liệu từ Redis nếu có
         for (const key of Object.keys(existingData)) {
             if (initialData[key]) {
                 initialData[key] = JSON.parse(existingData[key]);
@@ -163,6 +469,8 @@ router.get('/xsmb/sse/initial', apiLimiter, async (req, res) => {
         res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
     }
 });
+
+// Route SSE
 router.get('/xsmb/sse', sseLimiter, async (req, res) => {
     try {
         const { date, simulate, station } = req.query;
@@ -360,287 +668,7 @@ router.get('/xsmb/sse', sseLimiter, async (req, res) => {
     }
 });
 
-
-
-// Route lấy kết quả xổ số trong khoảng thời gian
-router.get('/xsmb/range', statsLimiter, async (req, res) => {
-    try {
-        const { startDate, endDate, limit = 30 } = req.query;
-        if (!startDate || !endDate) {
-            return res.status(400).json({ error: 'Vui lòng cung cấp startDate và endDate.' });
-        }
-
-        const parsedStartDate = parseDate(startDate);
-        const parsedEndDate = parseDate(endDate);
-        if (parsedStartDate > parsedEndDate) {
-            return res.status(400).json({ error: 'startDate phải nhỏ hơn hoặc bằng endDate.' });
-        }
-
-        // Giới hạn khoảng thời gian tối đa 30 ngày để tránh tải nặng
-        const maxDays = 30;
-        const diffDays = Math.ceil((parsedEndDate - parsedStartDate) / (1000 * 60 * 60 * 24));
-        if (diffDays > maxDays) {
-            return res.status(400).json({ error: `Khoảng thời gian không được vượt quá ${maxDays} ngày.` });
-        }
-
-        const cacheKey = `kqxs:range:xsmb:${startDate}:${endDate}:${limit}`;
-        const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-
-        const results = await XSMB.find({
-            station: 'xsmb',
-            drawDate: { $gte: parsedStartDate, $lte: parsedEndDate },
-        })
-            .lean()
-            .sort({ drawDate: -1 })
-            .limit(parseInt(limit));
-
-        if (!results.length) {
-            return res.status(404).json({ error: `Không tìm thấy dữ liệu XSMB từ ${startDate} đến ${endDate}.` });
-        }
-
-        await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
-        res.status(200).json(results);
-    } catch (error) {
-        console.error('Lỗi khi lấy KQXS trong khoảng thời gian:', error);
-        if (error.message.includes('không hợp lệ')) {
-            res.status(400).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
-        }
-    }
-});
-
-// Route lấy kết quả soi cầu bạch thủ trong khoảng thời gian
-router.get('/xsmb/soicau/bach-thu/range', statsLimiter, async (req, res) => {
-    try {
-        const { startDate, endDate, days } = req.query;
-        if (!startDate || !endDate || !days) {
-            return res.status(400).json({ error: 'Vui lòng cung cấp startDate, endDate và days.' });
-        }
-
-        const validDays = [3, 5, 7, 10, 14];
-        const numDays = parseInt(days);
-        if (!validDays.includes(numDays)) {
-            return res.status(400).json({ error: 'Số ngày không hợp lệ. Chỉ chấp nhận: 3, 5, 7, 10, 14.' });
-        }
-
-        const parsedStartDate = parseDate(startDate);
-        const parsedEndDate = parseDate(endDate);
-        if (parsedStartDate > parsedEndDate) {
-            return res.status(400).json({ error: 'startDate phải nhỏ hơn hoặc bằng endDate.' });
-        }
-
-        // Giới hạn khoảng thời gian tối đa 7 ngày để tối ưu hiệu suất
-        const maxDays = 7;
-        const diffDays = Math.ceil((parsedEndDate - parsedStartDate) / (1000 * 60 * 60 * 24));
-        if (diffDays > maxDays) {
-            return res.status(400).json({ error: `Khoảng thời gian không được vượt quá ${maxDays} ngày.` });
-        }
-
-        const cacheKey = `bachthu:range:${startDate}:${endDate}:days:${numDays}`;
-        const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-
-        const results = [];
-        let currentDate = new Date(parsedStartDate);
-        while (currentDate <= parsedEndDate) {
-            const formattedDate = currentDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-            try {
-                const reqMock = { query: { date: formattedDate, days: numDays } };
-                const resMock = {
-                    status: (code) => ({
-                        json: (data) => {
-                            if (code === 200) results.push(data);
-                            else console.warn(`Không lấy được soi cầu cho ngày ${formattedDate}:`, data);
-                        },
-                    }),
-                };
-                await getBachThuMB(reqMock, resMock);
-            } catch (err) {
-                console.warn(`Lỗi khi lấy soi cầu cho ngày ${formattedDate}:`, err.message);
-            }
-            currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        if (!results.length) {
-            return res.status(404).json({ error: `Không tìm thấy dữ liệu soi cầu từ ${startDate} đến ${endDate}.` });
-        }
-
-        await redisClient.setEx(cacheKey, 86400, JSON.stringify(results));
-        res.status(200).json(results);
-    } catch (error) {
-        console.error('Lỗi khi lấy soi cầu bạch thủ trong khoảng thời gian:', error);
-        if (error.message.includes('không hợp lệ')) {
-            res.status(400).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
-        }
-    }
-});
-
-// Các route hiện có
-router.get('/', apiLimiter, async (req, res) => {
-    try {
-        const { limit = 30 } = req.query;
-        const cacheKey = `kqxs:all:${limit}`;
-        const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-
-        const results = await XSMB.find()
-            .lean()
-            .sort({ drawDate: -1 })
-            .limit(parseInt(limit));
-
-        if (!results.length) {
-            return res.status(404).json({ error: 'Không tìm thấy dữ liệu KQXS' });
-        }
-
-        await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
-        res.status(200).json(results);
-    } catch (error) {
-        console.error('Lỗi khi lấy tất cả KQXS:', error);
-        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
-    }
-});
-
-router.get('/xsmb', apiLimiter, async (req, res) => {
-    try {
-        const { date, page = 1, perPage = 3 } = req.query; // Mặc định perPage=3
-        const query = { station: 'xsmb' };
-        if (date && /^\d{2}-\d{2}-\d{4}$/.test(date)) {
-            query.drawDate = parseDate(date);
-        }
-
-        const pageNum = parseInt(page);
-        const perPageNum = parseInt(perPage);
-        if (pageNum < 1 || perPageNum < 1) {
-            return res.status(400).json({ error: 'page và perPage phải lớn hơn 0' });
-        }
-
-        const cacheKey = `kqxs:xsmb:${date || 'all'}:page:${pageNum}:perPage:${perPageNum}`;
-        const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-
-        const results = await XSMB.find(query)
-            .lean()
-            .sort({ drawDate: -1 })
-            .skip((pageNum - 1) * perPageNum) // Bỏ qua các bản ghi của trang trước
-            .limit(perPageNum); // Giới hạn số bản ghi trả về
-
-        if (!results.length) {
-            return res.status(404).json({ error: `Không tìm thấy dữ liệu cho xsmb, date: ${date || 'all'}` });
-        }
-
-        // Lưu cache với TTL dài hơn (ví dụ: 1 giờ)
-        await redisClient.setEx(cacheKey, 3600, JSON.stringify(results));
-        res.status(200).json({
-            data: results,
-            page: pageNum,
-            perPage: perPageNum,
-            total: await XSMB.countDocuments(query), // Tổng số bản ghi để tính totalPages ở client
-        });
-    } catch (error) {
-        console.error('Lỗi khi lấy KQXS xsmb:', error);
-        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
-    }
-});
-
-router.get('/:slug', apiLimiter, async (req, res) => {
-    const { slug } = req.params;
-    try {
-        if (!slug || slug.trim() === '') {
-            return res.status(400).json({ error: 'Slug không được để trống' });
-        }
-        const cacheKey = `kqxs:slug:${slug}`;
-        const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-
-        const result = await XSMB.findOne({ slug })
-            .lean()
-            .sort({ drawDate: -1 });
-        if (!result) {
-            return res.status(404).json({ error: 'Không tìm thấy kết quả' });
-        }
-        await redisClient.setEx(cacheKey, 60, JSON.stringify(result));
-        res.status(200).json(result);
-    } catch (error) {
-        console.error('Lỗi khi lấy KQXS theo slug:', error);
-        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
-    }
-});
-
-router.get('/xsmb/:dayOfWeek', apiLimiter, async (req, res) => {
-    const { dayOfWeek } = req.params;
-    try {
-        if (!dayOfWeek || dayOfWeek.trim() === '') {
-            return res.status(400).json({ error: 'Thứ không được để trống' });
-        }
-
-        const cacheKey = `kqxs:day:${dayOfWeek}`;
-        const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-
-        const mappedDayOfWeek = mapDayOfWeek(dayOfWeek);
-        const results = await XSMB.find({
-            station: 'xsmb',
-            dayOfWeek: mappedDayOfWeek,
-        })
-            .lean()
-            .sort({ drawDate: -1 })
-            .limit(30);
-        if (!results || results.length === 0) {
-            return res.status(404).json({ error: `Không tìm thấy kết quả cho ${mappedDayOfWeek}` });
-        }
-        await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
-        res.status(200).json(results);
-    } catch (error) {
-        console.error('Lỗi khi lấy KQXS theo thứ:', error);
-        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
-    }
-});
-
-// Danh sách KQXS theo tỉnh (trả về bản ghi theo tỉnh)
-router.get('/xsmb/tinh/:tinh', apiLimiter, async (req, res) => {
-    const { tinh } = req.params;
-    try {
-        if (!tinh || tinh.trim() === '') {
-            return res.status(400).json({ error: 'Tinh cannot be empty' });
-        }
-
-        const cacheKey = `kqxs:xsmb:tinh:${tinh}`;
-        const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-
-        const result = await XSMB.find({ tinh }).lean()
-            .sort({ drawDate: -1 });
-
-        if (!result || result.length === 0) {
-            return res.status(404).json({ error: 'Result not found' });
-        }
-
-        await redisClient.setEx(cacheKey, 60, JSON.stringify(result));
-        res.status(200).json(result);
-    } catch (error) {
-        console.error('Lỗi lấy KQXS theo tỉnh:', error.message);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
+// Các route thống kê
 router.get('/xsmb/statistics/gan', statsLimiter, async (req, res) => {
     req.query.station = 'xsmb';
     await getLoGanStats(req, res);
@@ -680,6 +708,7 @@ router.get('/xsmb/soicau/soi-cau-bach-thu', statsLimiter, async (req, res) => {
     await getBachThuMB(req, res);
 });
 
+// Route xử lý webhook Telegram
 router.post('/telegram', async (req, res) => {
     try {
         const update = req.body;
@@ -693,9 +722,8 @@ router.post('/telegram', async (req, res) => {
         if (text === '/start') {
             await bot.sendMessage(chatId, 'Chào bạn! Gõ /xsmb để xem kết quả xổ số miền Bắc.');
         } else if (text === '/xsmb') {
-            // Gọi API /xsmb
             const response = await fetch('https://xsmb.win/xsmb', {
-                headers: { 'x-user-id': 'bot' }, // Thêm header để qua rate limiter
+                headers: { 'x-user-id': 'bot' },
             });
             const data = await response.json();
             if (response.status !== 200) {
@@ -703,7 +731,6 @@ router.post('/telegram', async (req, res) => {
                 return res.status(200).end();
             }
 
-            // Lấy kết quả mới nhất
             const latestResult = data[0];
             const resultText = `Kết quả XSMB ngày ${latestResult.drawDate.toLocaleDateString('vi-VN')}:\n` +
                 `Đặc biệt: ${latestResult.specialPrize_0 || 'Chưa có'}\n` +
@@ -721,4 +748,3 @@ router.post('/telegram', async (req, res) => {
 });
 
 module.exports = router;
-//  cần test thử(21/06)
