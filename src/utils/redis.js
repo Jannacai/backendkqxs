@@ -1,22 +1,10 @@
 const { createClient } = require('redis');
 
-// Singleton client và lock để tránh xung đột
 let redisClient;
-const redisLock = { initializing: false };
-const pendingPromises = []; // Queue cho các lời gọi getRedisClient
+const redisLock = {};
 
-// Hàm tính thời gian backoff theo exponential backoff
-const calculateBackoff = (attempt) => Math.min(1000 * Math.pow(2, attempt - 1), 8000); // Max 8s
-
-const initializeRedis = async (retryCount = 3) => {
-    if (redisLock.initializing) {
-        // Nếu đang khởi tạo, chờ và trả về client khi sẵn sàng
-        return new Promise((resolve) => {
-            pendingPromises.push(resolve);
-        });
-    }
-
-    if (!redisClient) {
+const initializeRedis = async (retryCount = 3, delayMs = 2000) => {
+    if (!redisClient && !redisLock.initializing) {
         redisLock.initializing = true;
         try {
             redisClient = createClient({
@@ -24,66 +12,45 @@ const initializeRedis = async (retryCount = 3) => {
                 socket: {
                     connectTimeout: 10000,
                     keepAlive: 1000,
-                    reconnectStrategy: (retries) => {
-                        if (retries >= retryCount) {
-                            console.error('Redis reconnect failed after max retries');
-                            return false; // Dừng reconnect
-                        }
-                        return calculateBackoff(retries + 1);
-                    },
                 },
             });
 
             redisClient.on('error', (err) => console.error('Redis Client Error:', err));
             redisClient.on('reconnecting', () => console.log('Redis client attempting to reconnect...'));
-            redisClient.on('ready', () => {
-                console.log('Redis client connected or reconnected successfully');
-                // Giải quyết các lời gọi đang chờ
-                while (pendingPromises.length) {
-                    pendingPromises.shift()(redisClient);
-                }
-            });
+            redisClient.on('ready', () => console.log('Redis client reconnected successfully'));
 
             for (let attempt = 1; attempt <= retryCount; attempt++) {
                 try {
                     await redisClient.connect();
-                    console.log(`Redis client connected on attempt ${attempt}`);
+                    console.log('Redis client connected');
                     break;
                 } catch (err) {
                     console.error(`Attempt ${attempt} failed to connect to Redis:`, err.message);
-                    if (attempt === retryCount) {
-                        throw new Error(`Failed to connect to Redis after ${retryCount} attempts`);
-                    }
-                    await new Promise(resolve => setTimeout(resolve, calculateBackoff(attempt)));
+                    if (attempt === retryCount) throw err;
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
                 }
             }
         } catch (err) {
-            console.error('Failed to initialize Redis:', err);
-            throw err; // Ném lỗi để caller xử lý
+            console.error('Failed to connect to Redis after retries:', err);
         } finally {
             redisLock.initializing = false;
         }
+    } else if (!redisClient) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return initializeRedis();
     }
-
     return redisClient;
 };
 
-const getRedisClient = async (commandTimeout = 5000) => {
+const getRedisClient = async () => {
     if (!redisClient || !redisClient.isOpen) {
-        try {
-            await initializeRedis();
-        } catch (err) {
-            console.error('getRedisClient failed:', err.message);
-            throw new Error('Redis unavailable, please try again later');
-        }
+        await initializeRedis();
     }
-
     if (!redisClient.isReady) {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        return getRedisClient(commandTimeout);
+        return getRedisClient();
     }
-
-    redisClient.options.commandTimeout = commandTimeout;
+    redisClient.options.commandTimeout = 5000; // 5 giây
     return redisClient;
 };
 
@@ -100,7 +67,6 @@ const closeRedis = async () => {
     }
 };
 
-// Đóng Redis khi server dừng
 process.on('SIGINT', async () => {
     await closeRedis();
     process.exit(0);
