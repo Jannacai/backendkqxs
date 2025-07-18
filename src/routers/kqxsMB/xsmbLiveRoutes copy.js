@@ -1,4 +1,3 @@
-// Cần test thử cho ngày 17/07
 const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
@@ -41,7 +40,6 @@ router.get('/initial', apiLimiter, async (req, res) => {
             : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
 
         let existingData = await redisClient.hGetAll(`kqxs:${targetDate}`);
-        const latestData = await redisClient.get(`kqxs:${targetDate}:latest`);
         const metadata = JSON.parse((await redisClient.hGet(`kqxs:${targetDate}:meta`, 'metadata')) || '{}');
 
         const initialData = {
@@ -80,22 +78,11 @@ router.get('/initial', apiLimiter, async (req, res) => {
             year: metadata.year || new Date().getFullYear(),
             month: metadata.month || new Date().getMonth() + 1,
             dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
-            lastUpdated: metadata.lastUpdated || 0,
         };
 
-        if (latestData) {
-            const parsedLatest = JSON.parse(latestData);
-            for (const key of Object.keys(parsedLatest)) {
-                if (initialData[key]) {
-                    initialData[key] = parsedLatest[key];
-                }
-            }
-            initialData.lastUpdated = parsedLatest.lastUpdated || Date.now();
-        } else {
-            for (const key of Object.keys(existingData)) {
-                if (initialData[key]) {
-                    initialData[key] = JSON.parse(existingData[key]);
-                }
+        for (const key of Object.keys(existingData)) {
+            if (initialData[key]) {
+                initialData[key] = JSON.parse(existingData[key]);
             }
         }
 
@@ -122,84 +109,33 @@ router.get('/', sseLimiter, async (req, res) => {
         res.setHeader('Content-Encoding', 'identity');
         res.flushHeaders();
 
+        // Gửi tin nhắn canary để xác nhận kết nối
         res.write('event: canary\ndata: {"message":"Connection established"}\n\n');
         res.flush();
         console.log(`Gửi canary message cho client, ngày ${targetDate}`);
 
-        const initialData = {
-            firstPrize_0: '...',
-            secondPrize_0: '...',
-            secondPrize_1: '...',
-            threePrizes_0: '...',
-            threePrizes_1: '...',
-            threePrizes_2: '...',
-            threePrizes_3: '...',
-            threePrizes_4: '...',
-            threePrizes_5: '...',
-            fourPrizes_0: '...',
-            fourPrizes_1: '...',
-            fourPrizes_2: '...',
-            fourPrizes_3: '...',
-            fivePrizes_0: '...',
-            fivePrizes_1: '...',
-            fivePrizes_2: '...',
-            fivePrizes_3: '...',
-            fourPrizes_4: '...',
-            fivePrizes_5: '...',
-            sixPrizes_0: '...',
-            sixPrizes_1: '...',
-            sixPrizes_2: '...',
-            sevenPrizes_0: '...',
-            sevenPrizes_1: '...',
-            sevenPrizes_2: '...',
-            sevenPrizes_3: '...',
-            maDB: '...',
-            specialPrize_0: '...',
-            drawDate: targetDate,
-            station: station || 'xsmb',
-            tentinh: 'Miền Bắc',
-            tinh: 'MB',
-            year: new Date().getFullYear(),
-            month: new Date().getMonth() + 1,
-            dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
-            lastUpdated: Date.now(),
-        };
-
+        // Gửi toàn bộ dữ liệu từ kho (Redis hash)
         let existingData = await redisClient.hGetAll(`kqxs:${targetDate}`);
-        const latestData = await redisClient.get(`kqxs:${targetDate}:latest`);
         const metadata = JSON.parse((await redisClient.hGet(`kqxs:${targetDate}:meta`, 'metadata')) || '{}');
-        if (latestData) {
-            const parsedLatest = JSON.parse(latestData);
-            for (const key of Object.keys(parsedLatest)) {
-                if (initialData[key]) {
-                    initialData[key] = parsedLatest[key];
-                }
+        for (const [prizeType, prizeData] of Object.entries(existingData)) {
+            if (prizeData && JSON.parse(prizeData) !== '...') {
+                const data = {
+                    [prizeType]: JSON.parse(prizeData),
+                    drawDate: targetDate,
+                    tentinh: metadata.tentinh || 'Miền Bắc',
+                    tinh: metadata.tinh || 'MB',
+                    year: metadata.year || new Date().getFullYear(),
+                    month: metadata.month || new Date().getMonth() + 1,
+                };
+                res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
+                res.flush();
+                console.log(`Gửi dữ liệu ban đầu từ kho: ${prizeType} = ${JSON.parse(prizeData)}`);
             }
-            initialData.lastUpdated = parsedLatest.lastUpdated || Date.now();
-        } else {
-            for (const key of Object.keys(existingData)) {
-                if (initialData[key]) {
-                    initialData[key] = JSON.parse(existingData[key]);
-                }
-            }
-        }
-        for (const [prizeType, prizeData] of Object.entries(initialData)) {
-            const data = {
-                [prizeType]: prizeData,
-                drawDate: targetDate,
-                tentinh: metadata.tentinh || 'Miền Bắc',
-                tinh: metadata.tinh || 'MB',
-                year: metadata.year || new Date().getFullYear(),
-                month: metadata.month || new Date().getMonth() + 1,
-                lastUpdated: initialData.lastUpdated,
-            };
-            res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
-            res.flush();
-            console.log(`Gửi dữ liệu ban đầu từ kho: ${prizeType} = ${prizeData}`);
         }
 
         const sendData = async (prizeType, prizeData, additionalData = {}) => {
             try {
+                // Kiểm tra để không ghi đè giá trị hợp lệ bằng '...'
                 if (prizeData === '...') {
                     const currentData = await redisClient.hGet(`kqxs:${targetDate}`, prizeType);
                     if (currentData && JSON.parse(currentData) !== '...') {
@@ -207,6 +143,7 @@ router.get('/', sseLimiter, async (req, res) => {
                         return;
                     }
                 }
+                // Lưu vào kho (Redis hash)
                 const data = {
                     [prizeType]: prizeData,
                     drawDate: targetDate,
@@ -214,36 +151,15 @@ router.get('/', sseLimiter, async (req, res) => {
                     tinh: additionalData.tinh || 'MB',
                     year: additionalData.year || new Date().getFullYear(),
                     month: additionalData.month || new Date().getMonth() + 1,
-                    lastUpdated: Date.now(),
                 };
                 await redisClient.hSet(`kqxs:${targetDate}`, prizeType, JSON.stringify(prizeData));
-                await redisClient.hSet(`kqxs:${targetDate}:meta`, 'metadata', JSON.stringify({
-                    ...additionalData,
-                    lastUpdated: data.lastUpdated,
-                }));
-                await redisClient.expire(`kqxs:${targetDate}`, 86400);
-                await redisClient.expire(`kqxs:${targetDate}:meta`, 86400);
-
-                let latestData = await redisClient.get(`kqxs:${targetDate}:latest`);
-                let fullData = latestData ? JSON.parse(latestData) : { ...initialData };
-                fullData[prizeType] = prizeData;
-                fullData.lastUpdated = data.lastUpdated;
-                fullData.tentinh = data.tentinh;
-                fullData.tinh = data.tinh;
-                fullData.year = data.year;
-                fullData.month = data.month;
-                await redisClient.set(`kqxs:${targetDate}:latest`, JSON.stringify(fullData));
-                await redisClient.expire(`kqxs:${targetDate}:latest`, 86400);
-
+                await redisClient.hSet(`kqxs:${targetDate}:meta`, 'metadata', JSON.stringify(additionalData));
+                await redisClient.expire(`kqxs:${targetDate}`, 7200);
+                await redisClient.expire(`kqxs:${targetDate}:meta`, 7200);
+                // Gửi sự kiện SSE tới tất cả client
                 res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
                 res.flush();
                 console.log(`Gửi SSE: ${prizeType} = ${prizeData} cho ngày ${targetDate}`);
-
-                if (prizeType === 'sixPrizes_1') {
-                    res.write(`event: full\ndata: ${JSON.stringify(fullData)}\n\n`);
-                    res.flush();
-                    console.log(`Gửi SSE full cho ngày ${targetDate}:`, fullData);
-                }
             } catch (error) {
                 console.error(`Lỗi gửi SSE (${prizeType}):`, error);
             }
@@ -278,7 +194,6 @@ router.get('/', sseLimiter, async (req, res) => {
             sevenPrizes_3: '98',
             maDB: '1ER - 13ER - 10ER - 7ER - 4ER - 8ER',
             specialPrize_0: '12345',
-            lastUpdated: Date.now(),
         };
 
         const simulateLiveDraw = async (data) => {
@@ -329,47 +244,22 @@ router.get('/', sseLimiter, async (req, res) => {
         }
 
         const subscriber = redis.createClient({ url: process.env.REDIS_URL });
-        let retryCount = 0;
-        const maxRetries = 5;
-        const retryDelay = 5000;
-
-        const connectSubscriber = async () => {
+        await subscriber.connect();
+        await subscriber.subscribe(`xsmb:${targetDate}`, async (message) => {
+            console.log('Nhận Redis message:', message);
             try {
-                await subscriber.connect();
-                console.log(`Đã kết nối Redis subscriber cho kênh xsmb:${targetDate}`);
-                await subscriber.subscribe(`xsmb:${targetDate}`, async (message) => {
-                    console.log('Nhận Redis message:', message);
-                    try {
-                        const { prizeType, prizeData, tentinh, tinh, year, month } = JSON.parse(message);
-                        if (prizeType && prizeData) {
-                            await sendData(prizeType, prizeData, { tentinh, tinh, year, month });
-                            retryCount = 0;
-                        } else {
-                            console.warn('Dữ liệu Redis không hợp lệ:', message);
-                        }
-                    } catch (error) {
-                        console.error('Lỗi xử lý Redis message:', error);
-                    }
-                });
-            } catch (error) {
-                console.error('Lỗi kết nối Redis subscriber:', error);
-                if (retryCount < maxRetries) {
-                    retryCount++;
-                    console.log(`Thử kết nối lại Redis subscriber (lần ${retryCount}/${maxRetries}) sau ${retryDelay}ms`);
-                    setTimeout(connectSubscriber, retryDelay);
+                const { prizeType, prizeData, tentinh, tinh, year, month } = JSON.parse(message);
+                if (prizeType && prizeData) {
+                    await sendData(prizeType, prizeData, { tentinh, tinh, year, month });
                 } else {
-                    console.error('Hết số lần thử kết nối Redis subscriber');
+                    console.warn('Dữ liệu Redis không hợp lệ:', message);
                 }
+            } catch (error) {
+                console.error('Lỗi xử lý Redis message:', error);
             }
-        };
-
-        await connectSubscriber();
+        });
 
         const keepAlive = setInterval(() => {
-            if (res.writableEnded) {
-                clearInterval(keepAlive);
-                return;
-            }
             res.write(': keep-alive\n\n');
             res.flush();
             console.log(`Gửi keep-alive cho client, ngày ${targetDate}`);

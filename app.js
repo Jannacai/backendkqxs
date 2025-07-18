@@ -9,7 +9,7 @@ const path = require("path");
 const routes = require("./src/routers/index");
 const fs = require("fs");
 require("dotenv").config();
-const { initializeWebSocket } = require("./src/websocket");
+// const { initializeWebSocket } = require("./src/websocket");
 
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
@@ -86,7 +86,7 @@ const setTelegramWebhook = async () => {
 setTelegramWebhook();
 
 // Khởi tạo WebSocket
-initializeWebSocket(server);
+// initializeWebSocket(server);
 
 // Gắn các route khác
 routes(app);
