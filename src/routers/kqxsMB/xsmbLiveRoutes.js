@@ -29,7 +29,7 @@ const sseLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 100,
+    max: 200,
     message: 'Quá nhiều yêu cầu, vui lòng thử lại sau',
 });
 

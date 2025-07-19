@@ -23,12 +23,11 @@ const calculate3D4D = require('./Dan3D4D/calculate3D4D.routes');
 const telegram = require('./routestelegram');
 
 const Routes = (app) => {
-    app.use('/api/ketqua', resultsRouterMN);
     app.use('/api/kqxs/xsmb/sse', LiveRouterMB);
     app.use('/api/ketquaxs/xsmt/sse', LiveRouterMT);
-    app.use('/api/ketqua/xsmn/sse', LiveRouterMN);
-
+    // app.use('/api/ketqua/xsmn/sse', LiveRouterMN);
     app.use('/api/kqxs', resultsRouterMB);
+    app.use('/api/ketqua', resultsRouterMN);
     app.use('/api/ketquaxs', resultsRouterMT);
     app.use('/api/kqxs/xsmb/soicau', soicauRouterMB);
 

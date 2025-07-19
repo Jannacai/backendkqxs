@@ -43,7 +43,7 @@ const sseLimiter = rateLimit({
 // Rate limiter cho các endpoint thông thường
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 100,
+    max: 300,
     message: { error: 'Quá nhiều yêu cầu API, vui lòng thử lại sau một phút.' },
 });
 
