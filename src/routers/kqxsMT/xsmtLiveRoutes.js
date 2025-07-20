@@ -359,7 +359,7 @@ router.get('/', sseLimiter, async (req, res) => {
         const subscriber = redis.createClient({ url: process.env.REDIS_URL });
         let retryCount = 0;
         const maxRetries = 5;
-        const retryDelay = 2000;
+        const retryDelay = 4000;
 
         const connectSubscriber = async () => {
             try {
@@ -401,7 +401,7 @@ router.get('/', sseLimiter, async (req, res) => {
             res.write(': keep-alive\n\n');
             res.flush();
             console.log(`Gửi keep-alive cho client XSMT, ngày ${targetDate}, tỉnh ${tinh}`);
-        }, 2000);
+        }, 4000);
 
         req.on('close', async () => {
             clearInterval(keepAlive);

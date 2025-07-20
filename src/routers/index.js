@@ -25,7 +25,7 @@ const telegram = require('./routestelegram');
 const Routes = (app) => {
     app.use('/api/kqxs/xsmb/sse', LiveRouterMB);
     app.use('/api/ketquaxs/xsmt/sse', LiveRouterMT);
-    // app.use('/api/ketqua/xsmn/sse', LiveRouterMN);
+    app.use('/api/ketqua/xsmn/sse', LiveRouterMN);
     app.use('/api/kqxs', resultsRouterMB);
     app.use('/api/ketqua', resultsRouterMN);
     app.use('/api/ketquaxs', resultsRouterMT);
