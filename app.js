@@ -9,7 +9,7 @@ const path = require("path");
 const routes = require("./src/routers/index");
 const fs = require("fs");
 require("dotenv").config();
-const { initSocket } = require("./src/routers/kqxsMT/socket");
+// const { initSocket } = require("./src/routers/kqxsMT/socket");
 
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
