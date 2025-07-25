@@ -1,19 +1,13 @@
 const { createClient } = require('redis');
+const { createPool } = require('generic-pool');
 
 class RedisManager {
     constructor() {
-        this.client = null;
-        this.connectionPromise = null;
         this.HEARTBEAT_INTERVAL = 30000; // 30s
-    }
-
-    async initialize(retryCount = 5, delayMs = 3000) {
-        if (this.connectionPromise) return this.connectionPromise;
-
-        this.connectionPromise = (async () => {
-            for (let attempt = 1; attempt <= retryCount; attempt++) {
+        this.pool = createPool({
+            create: async () => {
                 try {
-                    this.client = createClient({
+                    const client = createClient({
                         url: process.env.REDIS_URL || 'redis://localhost:6379',
                         socket: {
                             connectTimeout: 10000,
@@ -24,74 +18,87 @@ class RedisManager {
                             },
                         },
                     });
-
-                    this.client.on('error', (err) =>
-                        console.error('Redis Client Error:', err));
-                    this.client.on('ready', () =>
-                        this.startHeartbeat());
-
-                    await this.client.connect();
-                    console.log('Redis connected successfully');
-                    return this.client;
+                    client.on('error', (err) => console.error('Redis Client Error:', err));
+                    client.on('ready', () => {
+                        console.log('Redis client connected successfully');
+                        this.startHeartbeat(client);
+                    });
+                    await client.connect();
+                    return client;
                 } catch (err) {
-                    console.error(`Attempt ${attempt} failed:`, err.message);
-                    if (attempt === retryCount) throw err;
-                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                    console.error('Failed to create Redis client:', err);
+                    throw err;
                 }
-            }
-        })();
-
-        return this.connectionPromise;
+            },
+            destroy: async (client) => {
+                if (client.isOpen) {
+                    await client.quit();
+                }
+            },
+        }, {
+            min: 5,
+            max: 100,
+            autostart: true,
+        });
     }
 
-    startHeartbeat() {
-        this.heartbeatInterval = setInterval(async () => {
+    startHeartbeat(client) {
+        const heartbeatInterval = setInterval(async () => {
             try {
-                await this.client.ping();
+                if (client.isOpen) {
+                    await client.ping();
+                }
             } catch (err) {
                 console.error('Redis heartbeat failed:', err);
-                this.reconnect();
+                if (client.isOpen) {
+                    await client.quit();
+                }
             }
         }, this.HEARTBEAT_INTERVAL);
-    }
 
-    async reconnect() {
-        clearInterval(this.heartbeatInterval);
-        this.connectionPromise = null;
-        if (this.client?.isOpen) await this.client.quit();
-        this.client = null;
-        return this.initialize();
+        client.on('end', () => {
+            clearInterval(heartbeatInterval);
+        });
     }
 
     async getClient() {
-        if (!this.client || !this.client.isReady) {
-            if (!this.connectionPromise) {
-                await this.initialize();
-            } else {
-                await this.connectionPromise;
-            }
-        }
-        return this.client;
+        const client = await this.pool.acquire();
+        console.log(`Acquired Redis client, pool status: ${this.pool.available}/${this.pool.size}`);
+        return client;
     }
 
-    async close() {
-        clearInterval(this.heartbeatInterval);
-        if (this.client?.isOpen) await this.client.quit();
-        this.client = null;
-        this.connectionPromise = null;
+    async getSubscriber() {
+        const client = await this.pool.acquire();
+        console.log(`Acquired Redis subscriber, pool status: ${this.pool.available}/${this.pool.size}`);
+        return client;
+    }
+
+    async release(client) {
+        if (client?.isOpen) {
+            await this.pool.release(client);
+            console.log(`Released Redis client, pool status: ${this.pool.available}/${this.pool.size}`);
+        }
+    }
+
+    async close(client) {
+        if (client?.isOpen) {
+            await this.pool.destroy(client);
+            console.log(`Closed Redis client, pool status: ${this.pool.available}/${this.pool.size}`);
+        }
     }
 }
 
-// Singleton instance
 const redisManager = new RedisManager();
 
 process.on('SIGINT', async () => {
-    await redisManager.close();
+    await redisManager.pool.drain();
+    await redisManager.pool.clear();
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-    await redisManager.close();
+    await redisManager.pool.drain();
+    await redisManager.pool.clear();
     process.exit(0);
 });
 
