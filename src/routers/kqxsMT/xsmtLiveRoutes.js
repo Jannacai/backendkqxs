@@ -4,6 +4,10 @@ const rateLimit = require('express-rate-limit');
 const redisManager = require('../../utils/redisMT');
 const { v4: uuidv4 } = require('uuid');
 const { format } = require('date-fns');
+const NodeCache = require('node-cache');
+
+// Khởi tạo node-cache với TTL 30 giây
+const cache = new NodeCache({ stdTTL: 45 });
 
 // Set để theo dõi clientId đang hoạt động
 const activeClients = new Set();
@@ -22,7 +26,11 @@ const apiLimiter = rateLimit({
 });
 
 const provincesByDay = {
-    0: { 'kon-tum': { tentinh: 'Kon Tum', tinh: 'kon-tum' }, 'khanh-hoa': { tentinh: 'Khánh Hòa', tinh: 'khanh-hoa' }, 'hue': { tentinh: 'Thừa Thiên Huế', tinh: 'hue' } },
+    0: [
+        { tinh: 'hue', tentinh: 'Huế' },
+        { tinh: 'kon-tum', tentinh: 'Kon Tum' },
+        { tinh: 'khanh-hoa', tentinh: 'Khánh Hòa' },
+    ],
     1: { 'phu-yen': { tentinh: 'Phú Yên', tinh: 'phu-yen' }, 'hue': { tentinh: 'Thừa Thiên Huế', tinh: 'hue' } },
     2: { 'dak-lak': { tentinh: 'Đắk Lắk', tinh: 'dak-lak' }, 'quang-nam': { tentinh: 'Quảng Nam', tinh: 'quang-nam' } },
     3: { 'da-nang': { tentinh: 'Đà Nẵng', tinh: 'da-nang' }, 'khanh-hoa': { tentinh: 'Khánh Hòa', tinh: 'khanh-hoa' } },
@@ -58,6 +66,14 @@ router.get('/initial', apiLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Không có tỉnh nào cho ngày này.' });
         }
 
+        // Kiểm tra cache
+        const cacheKey = `initial:xsmt:${targetDate}`;
+        let initialData = cache.get(cacheKey);
+        if (initialData) {
+            console.log(`Serving /initial from cache for date ${targetDate}`);
+            return res.status(200).json(initialData);
+        }
+
         redisClient = await redisManager.getClient();
         const multi = redisClient.multi();
         const metaKeys = Object.values(provinces).map(province => `${`kqxs:xsmt:${targetDate}:${province.tinh}`}:meta`);
@@ -69,7 +85,7 @@ router.get('/initial', apiLimiter, async (req, res) => {
         });
         const results = await multi.exec();
 
-        const initialData = Object.values(provinces).map((province, index) => {
+        initialData = Object.values(provinces).map((province, index) => {
             const redisData = results[index] || {};
             const metadata = JSON.parse(results[index + Object.values(provinces).length] || '{}');
 
@@ -113,6 +129,8 @@ router.get('/initial', apiLimiter, async (req, res) => {
             return data;
         });
 
+        // Lưu vào cache
+        cache.set(cacheKey, initialData, 30);
         console.log(`Gửi dữ liệu khởi tạo XSMT cho ngày ${targetDate}:`, initialData);
         res.status(200).json(initialData);
     } catch (error) {
@@ -129,15 +147,19 @@ router.get('/', sseLimiter, async (req, res) => {
     const clientKeyPrefix = 'sse:client';
     let clientId = req.query.clientId || uuidv4();
 
+    // Đảm bảo đặt header ngay từ đầu để tránh lỗi MIME type
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Content-Encoding', 'identity');
+    res.flushHeaders();
+
     try {
         const { date, station, simulate } = req.query;
         if (station !== 'xsmt') {
-            if (!res.writableEnded && !res.headersSent) {
-                res.write('event: error\ndata: {"error":"Station không hợp lệ. Chỉ hỗ trợ xsmt."}\n\n');
-                res.flush();
-                return res.status(400).end();
-            }
-            return;
+            res.write('event: error\ndata: {"error":"Station không hợp lệ. Chỉ hỗ trợ xsmt."}\n\n');
+            res.flush();
+            return res.end();
         }
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? date
@@ -145,22 +167,16 @@ router.get('/', sseLimiter, async (req, res) => {
         const dayOfWeek = parseDate(targetDate).getDay();
         const provinces = provincesByDay[dayOfWeek] || provincesByDay[6];
         if (!provinces) {
-            if (!res.writableEnded && !res.headersSent) {
-                res.write('event: error\ndata: {"error":"Không có tỉnh nào cho ngày này."}\n\n');
-                res.flush();
-                return res.status(400).end();
-            }
-            return;
+            res.write('event: error\ndata: {"error":"Không có tỉnh nào cho ngày này."}\n\n');
+            res.flush();
+            return res.end();
         }
 
         if (activeClients.has(clientId)) {
             console.log(`Client ${clientId} đã có kết nối hoạt động, từ chối kết nối mới.`);
-            if (!res.writableEnded && !res.headersSent) {
-                res.write(`event: error\ndata: {"error":"Kết nối trùng lặp cho clientId ${clientId}."}\n\n`);
-                res.flush();
-                return res.status(409).end();
-            }
-            return;
+            res.write(`event: error\ndata: {"error":"Kết nối trùng lặp cho clientId ${clientId}."}\n\n`);
+            res.flush();
+            return res.end();
         }
 
         activeClients.add(clientId);
@@ -176,13 +192,6 @@ router.get('/', sseLimiter, async (req, res) => {
             const meta = JSON.parse(existingClient);
             if (Date.now() - meta.lastConnected < keepAliveTimeout) {
                 console.log(`Reusing existing SSE connection for client ${clientId}, lastConnected: ${new Date(meta.lastConnected).toISOString()}`);
-                if (!res.writableEnded && !res.headersSent) {
-                    res.setHeader('Content-Type', 'text/event-stream');
-                    res.setHeader('Cache-Control', 'no-cache');
-                    res.setHeader('Connection', 'keep-alive');
-                    res.setHeader('Content-Encoding', 'identity');
-                    res.flushHeaders();
-                }
                 res.write(`event: canary\ndata: {"message":"Reconnected","clientId":"${clientId}"}\n\n`);
                 res.flush();
             } else {
@@ -190,30 +199,16 @@ router.get('/', sseLimiter, async (req, res) => {
                 clientId = uuidv4();
                 await redisClient.set(clientMetaKey, JSON.stringify({ lastConnected: Date.now() }));
                 await redisClient.expire(clientMetaKey, keepAliveTimeout / 1000);
-                if (!res.writableEnded && !res.headersSent) {
-                    res.setHeader('Content-Type', 'text/event-stream');
-                    res.setHeader('Cache-Control', 'no-cache');
-                    res.setHeader('Connection', 'keep-alive');
-                    res.setHeader('Content-Encoding', 'identity');
-                    res.flushHeaders();
-                    res.write(`event: canary\ndata: {"message":"Connection established","clientId":"${clientId}"}\n\n`);
-                    res.flush();
-                }
+                res.write(`event: canary\ndata: {"message":"Connection established","clientId":"${clientId}"}\n\n`);
+                res.flush();
                 console.log(`Sent canary message for client ${clientId}, date ${targetDate}`);
             }
         } else {
             await redisClient.set(clientMetaKey, JSON.stringify({ lastConnected: Date.now() }));
             await redisClient.expire(clientMetaKey, keepAliveTimeout / 1000);
-            if (!res.writableEnded && !res.headersSent) {
-                res.setHeader('Content-Type', 'text/event-stream');
-                res.setHeader('Cache-Control', 'no-cache');
-                res.setHeader('Connection', 'keep-alive');
-                res.setHeader('Content-Encoding', 'identity');
-                res.flushHeaders();
-                res.write(`event: canary\ndata: {"message":"Connection established","clientId":"${clientId}"}\n\n`);
-                res.flush();
-                console.log(`Sent canary message for client ${clientId}, date ${targetDate}`);
-            }
+            res.write(`event: canary\ndata: {"message":"Connection established","clientId":"${clientId}"}\n\n`);
+            res.flush();
+            console.log(`Sent canary message for client ${clientId}, date ${targetDate}`);
         }
 
         const prizeTypes = [
@@ -306,6 +301,45 @@ router.get('/', sseLimiter, async (req, res) => {
                     multi.expire(`${key}:meta`, 86400);
                     await multi.exec();
 
+                    // Cập nhật cache
+                    const cacheKey = `initial:xsmt:${targetDate}`;
+                    let cachedData = cache.get(cacheKey);
+                    if (!cachedData) {
+                        cachedData = Object.values(provinces).map(province => ({
+                            eightPrizes_0: '...',
+                            sevenPrizes_0: '...',
+                            sixPrizes_0: '...',
+                            sixPrizes_1: '...',
+                            sixPrizes_2: '...',
+                            fivePrizes_0: '...',
+                            fourPrizes_0: '...',
+                            fourPrizes_1: '...',
+                            fourPrizes_2: '...',
+                            fourPrizes_3: '...',
+                            fourPrizes_4: '...',
+                            fourPrizes_5: '...',
+                            fourPrizes_6: '...',
+                            threePrizes_0: '...',
+                            threePrizes_1: '...',
+                            secondPrize_0: '...',
+                            firstPrize_0: '...',
+                            specialPrize_0: '...',
+                            drawDate: targetDate,
+                            station: 'xsmt',
+                            tentinh: province.tentinh,
+                            tinh: province.tinh,
+                            year: new Date().getFullYear(),
+                            month: new Date().getMonth() + 1,
+                            dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
+                            lastUpdated: 0,
+                        }));
+                    }
+                    cachedData = cachedData.map(item =>
+                        item.tinh === tinh ? { ...item, [prizeType]: prizeData, lastUpdated: Date.now() } : item
+                    );
+                    cache.set(cacheKey, cachedData, 30);
+                    console.log(`Updated cache for ${cacheKey}, prizeType: ${prizeType}, tỉnh: ${tinh}`);
+
                     const data = {
                         tinh,
                         tentinh: additionalData.tentinh || provinces[tinh]?.tentinh || tinh,
@@ -340,6 +374,13 @@ router.get('/', sseLimiter, async (req, res) => {
                         res.write(`event: full\ndata: ${JSON.stringify(fullData)}\n\n`);
                         res.flush();
                         console.log(`Sent SSE full data for client ${clientId}, tỉnh ${tinh}:`, fullData);
+
+                        // Cập nhật cache cho sự kiện full
+                        cachedData = cachedData.map(item =>
+                            item.tinh === tinh ? { ...item, ...fullData, lastUpdated: Date.now() } : item
+                        );
+                        cache.set(cacheKey, cachedData, 30);
+                        console.log(`Updated cache for ${cacheKey}, full data, tỉnh: ${tinh}`);
                     }
 
                     await redisClient.set(clientMetaKey, JSON.stringify({ lastConnected: Date.now() }));
@@ -492,10 +533,10 @@ router.get('/', sseLimiter, async (req, res) => {
     } catch (error) {
         console.error(`Lỗi khi thiết lập SSE XSMT cho client ${clientId}:`, error);
         activeClients.delete(clientId);
-        if (!res.writableEnded && !res.headersSent) {
+        if (!res.writableEnded) {
             res.write(`event: error\ndata: {"error":"Lỗi thiết lập kết nối SSE, thử lại sau."}\n\n`);
             res.flush();
-            res.status(500).end();
+            res.end();
         }
         await redisManager.release(subscriber);
         await redisManager.release(redisClient);
@@ -503,4 +544,3 @@ router.get('/', sseLimiter, async (req, res) => {
 });
 
 module.exports = router;
-// test 2: 25-7
