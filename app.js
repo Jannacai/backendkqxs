@@ -28,7 +28,7 @@ app.use(
     "/uploads",
     express.static(uploadsDir, {
         setHeaders: (res, filePath) => {
-            res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:3000");
+            res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL5 || "http://localhost:3000");
         },
     })
 );
@@ -36,7 +36,7 @@ app.use(
 // Khởi tạo middleware
 app.use(
     cors({
-        origin: process.env.FRONTEND_URL || "http://localhost:3000",
+        origin: process.env.FRONTEND_URL5 || "http://localhost:3000",
         methods: ["GET", "POST", "DELETE", "PUT"],
         credentials: true,
     })
