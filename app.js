@@ -2,22 +2,20 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const morgan = require("morgan");
-const http = require("http");
 const { default: helmet } = require("helmet");
 const compression = require("compression");
 const path = require("path");
 const routes = require("./src/routers/index");
 const fs = require("fs");
+const spdy = require("spdy");
 require("dotenv").config();
-// const { initSocket } = require("./src/routers/kqxsMT/socket");
-
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
 const app = express();
-const server = http.createServer(app);
 
 app.set("trust proxy", 1);
 process.env.TZ = 'Asia/Ho_Chi_Minh';
+
 // Tạo thư mục uploads nếu chưa tồn tại
 const uploadsDir = path.join(__dirname, "Uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -85,9 +83,6 @@ const setTelegramWebhook = async () => {
 // Gọi hàm thiết lập webhook khi server khởi động
 setTelegramWebhook();
 
-// Khởi tạo WebSocket
-// initSocket(server);
-
 // Gắn các route khác
 routes(app);
 
@@ -96,5 +91,14 @@ app.use((err, req, res, next) => {
     console.error("Lỗi chưa xử lý:", err.message);
     res.status(500).send("Lỗi máy chủ");
 });
+
+// Tạo server HTTP/2 với chứng chỉ SSL/TLS
+const server = spdy.createServer(
+    {
+        key: fs.readFileSync(path.join(__dirname, "certs", "server.key")),
+        cert: fs.readFileSync(path.join(__dirname, "certs", "server.crt")),
+    },
+    app
+);
 
 module.exports = { app, server };
