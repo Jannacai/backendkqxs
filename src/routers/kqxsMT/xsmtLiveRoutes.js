@@ -6,11 +6,8 @@ const { v4: uuidv4 } = require('uuid');
 const { format } = require('date-fns');
 const NodeCache = require('node-cache');
 
-// Khởi tạo node-cache với TTL 30 giây
-const cache = new NodeCache({ stdTTL: 45 });
-
-// Set để theo dõi clientId đang hoạt động
-const activeClients = new Set();
+// Khởi tạo node-cache với TTL 15 giây
+const cache = new NodeCache({ stdTTL: 15 });
 
 const sseLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -26,17 +23,37 @@ const apiLimiter = rateLimit({
 });
 
 const provincesByDay = {
-    1: [
-        { tinh: 'hue', tentinh: 'Huế' },
+    0: [
         { tinh: 'kon-tum', tentinh: 'Kon Tum' },
         { tinh: 'khanh-hoa', tentinh: 'Khánh Hòa' },
+        { tinh: 'hue', tentinh: 'Thừa Thiên Huế' },
     ],
-    // 1: { 'phu-yen': { tentinh: 'Phú Yên', tinh: 'phu-yen' }, 'hue': { tentinh: 'Thừa Thiên Huế', tinh: 'hue' } },
-    2: { 'dak-lak': { tentinh: 'Đắk Lắk', tinh: 'dak-lak' }, 'quang-nam': { tentinh: 'Quảng Nam', tinh: 'quang-nam' } },
-    3: { 'da-nang': { tentinh: 'Đà Nẵng', tinh: 'da-nang' }, 'khanh-hoa': { tentinh: 'Khánh Hòa', tinh: 'khanh-hoa' } },
-    4: { 'binh-dinh': { tentinh: 'Bình Định', tinh: 'binh-dinh' }, 'quang-tri': { tentinh: 'Quảng Trị', tinh: 'quang-tri' }, 'quang-binh': { tentinh: 'Quảng Bình', tinh: 'quang-binh' } },
-    5: { 'gia-lai': { tentinh: 'Gia Lai', tinh: 'gia-lai' }, 'ninh-thuan': { tentinh: 'Ninh Thuận', tinh: 'ninh-thuan' } },
-    6: { 'da-nang': { tentinh: 'Đà Nẵng', tinh: 'da-nang' }, 'quang-ngai': { tentinh: 'Quảng Ngãi', tinh: 'quang-ngai' }, 'dak-nong': { tentinh: 'Đắk Nông', tinh: 'dak-nong' } },
+    1: [
+        { tinh: 'phu-yen', tentinh: 'Phú Yên' },
+        { tinh: 'hue', tentinh: 'Thừa Thiên Huế' },
+    ],
+    2: [
+        { tinh: 'dak-lak', tentinh: 'Đắk Lắk' },
+        { tinh: 'quang-nam', tentinh: 'Quảng Nam' },
+    ],
+    3: [
+        { tinh: 'da-nang', tentinh: 'Đà Nẵng' },
+        { tinh: 'khanh-hoa', tentinh: 'Khánh Hòa' },
+    ],
+    4: [
+        { tinh: 'binh-dinh', tentinh: 'Bình Định' },
+        { tinh: 'quang-tri', tentinh: 'Quảng Trị' },
+        { tinh: 'quang-binh', tentinh: 'Quảng Bình' },
+    ],
+    5: [
+        { tinh: 'gia-lai', tentinh: 'Gia Lai' },
+        { tinh: 'ninh-thuan', tentinh: 'Ninh Thuận' },
+    ],
+    6: [
+        { tinh: 'da-nang', tentinh: 'Đà Nẵng' },
+        { tinh: 'quang-ngai', tentinh: 'Quảng Ngãi' },
+        { tinh: 'dak-nong', tentinh: 'Đắk Nông' },
+    ],
 };
 
 const parseDate = (dateStr) => {
@@ -53,7 +70,7 @@ const parseDate = (dateStr) => {
 router.get('/initial', apiLimiter, async (req, res) => {
     let redisClient;
     try {
-        const { date, station } = req.query;
+        const { date, station, tinh } = req.query;
         if (station !== 'xsmt') {
             return res.status(400).json({ error: 'Station không hợp lệ. Chỉ hỗ trợ xsmt.' });
         }
@@ -66,18 +83,28 @@ router.get('/initial', apiLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Không có tỉnh nào cho ngày này.' });
         }
 
+        const selectedProvinces = tinh
+            ? provinces.filter(province => province.tinh === tinh)
+            : provinces;
+
+        if (tinh && selectedProvinces.length === 0) {
+            return res.status(400).json({ error: 'Tỉnh không hợp lệ hoặc không quay số vào ngày này.' });
+        }
+
         // Kiểm tra cache
-        const cacheKey = `initial:xsmt:${targetDate}`;
+        const cacheKey = tinh
+            ? `initial:xsmt:${targetDate}:${tinh}`
+            : `initial:xsmt:${targetDate}`;
         let initialData = cache.get(cacheKey);
         if (initialData) {
-            console.log(`Serving /initial from cache for date ${targetDate}`);
+            console.log(`Serving /initial from cache for date ${targetDate}, tinh ${tinh || 'all'}`);
             return res.status(200).json(initialData);
         }
 
         redisClient = await redisManager.getClient();
         const multi = redisClient.multi();
-        const metaKeys = Object.values(provinces).map(province => `${`kqxs:xsmt:${targetDate}:${province.tinh}`}:meta`);
-        Object.values(provinces).forEach(province => {
+        const metaKeys = selectedProvinces.map(province => `${`kqxs:xsmt:${targetDate}:${province.tinh}`}:meta`);
+        selectedProvinces.forEach(province => {
             multi.hGetAll(`kqxs:xsmt:${targetDate}:${province.tinh}`);
         });
         metaKeys.forEach(key => {
@@ -85,29 +112,11 @@ router.get('/initial', apiLimiter, async (req, res) => {
         });
         const results = await multi.exec();
 
-        initialData = Object.values(provinces).map((province, index) => {
+        initialData = selectedProvinces.map((province, index) => {
             const redisData = results[index] || {};
-            const metadata = JSON.parse(results[index + Object.values(provinces).length] || '{}');
+            const metadata = JSON.parse(results[index + selectedProvinces.length] || '{}');
 
             const data = {
-                eightPrizes_0: '...',
-                sevenPrizes_0: '...',
-                sixPrizes_0: '...',
-                sixPrizes_1: '...',
-                sixPrizes_2: '...',
-                fivePrizes_0: '...',
-                fourPrizes_0: '...',
-                fourPrizes_1: '...',
-                fourPrizes_2: '...',
-                fourPrizes_3: '...',
-                fourPrizes_4: '...',
-                fourPrizes_5: '...',
-                fourPrizes_6: '...',
-                threePrizes_0: '...',
-                threePrizes_1: '...',
-                secondPrize_0: '...',
-                firstPrize_0: '...',
-                specialPrize_0: '...',
                 drawDate: targetDate,
                 station: station || 'xsmt',
                 tentinh: province.tentinh,
@@ -118,8 +127,11 @@ router.get('/initial', apiLimiter, async (req, res) => {
                 lastUpdated: 0,
             };
 
+            // Chỉ thêm các giải có dữ liệu !== '...'
             for (const key of Object.keys(redisData)) {
-                data[key] = JSON.parse(redisData[key]) || data[key];
+                if (key in redisData && redisData[key] !== '...' && redisData[key] !== '"..."') {
+                    data[key] = JSON.parse(redisData[key]) || redisData[key];
+                }
             }
             data.lastUpdated = redisData.lastUpdated ? JSON.parse(redisData.lastUpdated) : 0;
             data.year = metadata.year || data.year;
@@ -129,9 +141,21 @@ router.get('/initial', apiLimiter, async (req, res) => {
             return data;
         });
 
+        // Server Push cho các tỉnh khác nếu không có query tinh
+        if (!tinh && res.push) {
+            provinces.forEach(province => {
+                if (!selectedProvinces.find(p => p.tinh === province.tinh)) {
+                    res.push(`/api/ketquaxs/xsmt/sse/initial?station=${station}&date=${targetDate}&tinh=${province.tinh}`, {
+                        method: 'GET',
+                        response: { 'content-type': 'application/json' },
+                    }).end(JSON.stringify(initialData.find(item => item.tinh === province.tinh) || {}));
+                }
+            });
+        }
+
         // Lưu vào cache
-        cache.set(cacheKey, initialData, 30);
-        console.log(`Gửi dữ liệu khởi tạo XSMT cho ngày ${targetDate}:`, initialData);
+        cache.set(cacheKey, initialData, 15);
+        console.log(`Gửi dữ liệu khởi tạo XSMT cho ngày ${targetDate}, tinh ${tinh || 'all'}:`, initialData);
         res.status(200).json(initialData);
     } catch (error) {
         console.error('Error fetching initial state from Redis:', error.message);
@@ -143,7 +167,7 @@ router.get('/initial', apiLimiter, async (req, res) => {
 
 router.get('/', sseLimiter, async (req, res) => {
     let redisClient, subscriber;
-    const keepAliveTimeout = 90000;
+    const keepAliveTimeout = 150000;
     const clientKeyPrefix = 'sse:client';
     let clientId = req.query.clientId || uuidv4();
 
@@ -155,7 +179,7 @@ router.get('/', sseLimiter, async (req, res) => {
     res.flushHeaders();
 
     try {
-        const { date, station, simulate } = req.query;
+        const { date, station, simulate, tinh } = req.query;
         if (station !== 'xsmt') {
             res.write('event: error\ndata: {"error":"Station không hợp lệ. Chỉ hỗ trợ xsmt."}\n\n');
             res.flush();
@@ -172,15 +196,15 @@ router.get('/', sseLimiter, async (req, res) => {
             return res.end();
         }
 
-        if (activeClients.has(clientId)) {
-            console.log(`Client ${clientId} đã có kết nối hoạt động, từ chối kết nối mới.`);
-            res.write(`event: error\ndata: {"error":"Kết nối trùng lặp cho clientId ${clientId}."}\n\n`);
+        const selectedProvinces = tinh
+            ? provinces.filter(province => province.tinh === tinh)
+            : provinces;
+
+        if (tinh && selectedProvinces.length === 0) {
+            res.write('event: error\ndata: {"error":"Tỉnh không hợp lệ hoặc không quay số vào ngày này."}\n\n');
             res.flush();
             return res.end();
         }
-
-        activeClients.add(clientId);
-        console.log(`SSE XSMT connection started for client ${clientId}, date ${targetDate}, simulate: ${simulate === 'true'}`);
 
         redisClient = await redisManager.getClient();
         subscriber = await redisManager.getSubscriber();
@@ -211,6 +235,16 @@ router.get('/', sseLimiter, async (req, res) => {
             console.log(`Sent canary message for client ${clientId}, date ${targetDate}`);
         }
 
+        // Server Push dữ liệu /initial cho các tỉnh
+        if (res.push) {
+            selectedProvinces.forEach(province => {
+                res.push(`/api/ketquaxs/xsmt/sse/initial?station=${station}&date=${targetDate}&tinh=${province.tinh}`, {
+                    method: 'GET',
+                    response: { 'content-type': 'application/json' },
+                }).end(JSON.stringify({}));
+            });
+        }
+
         const prizeTypes = [
             'eightPrizes_0', 'sevenPrizes_0', 'sixPrizes_0', 'sixPrizes_1', 'sixPrizes_2',
             'fivePrizes_0', 'fourPrizes_0', 'fourPrizes_1', 'fourPrizes_2', 'fourPrizes_3',
@@ -219,8 +253,8 @@ router.get('/', sseLimiter, async (req, res) => {
         ];
 
         const multi = redisClient.multi();
-        const metaKeys = Object.values(provinces).map(province => `${`kqxs:xsmt:${targetDate}:${province.tinh}`}:meta`);
-        Object.values(provinces).forEach(province => {
+        const metaKeys = selectedProvinces.map(province => `${`kqxs:xsmt:${targetDate}:${province.tinh}`}:meta`);
+        selectedProvinces.forEach(province => {
             multi.hGetAll(`kqxs:xsmt:${targetDate}:${province.tinh}`);
         });
         metaKeys.forEach(key => {
@@ -228,32 +262,33 @@ router.get('/', sseLimiter, async (req, res) => {
         });
         const results = await multi.exec();
 
-        Object.values(provinces).forEach(async (province, index) => {
+        selectedProvinces.forEach(async (province, index) => {
             if (res.writableEnded) return;
             const redisData = results[index] || {};
-            const metadata = JSON.parse(results[index + Object.values(provinces).length] || '{}');
+            const metadata = JSON.parse(results[index + selectedProvinces.length] || '{}');
 
             for (const prizeType of prizeTypes) {
                 const prizeData = redisData[prizeType] ? JSON.parse(redisData[prizeType]) : '...';
-                const data = {
-                    tinh: province.tinh,
-                    tentinh: metadata.tentinh || province.tentinh,
-                    prizeType,
-                    prizeData,
-                    year: metadata.year || new Date().getFullYear(),
-                    month: metadata.month || new Date().getMonth() + 1,
-                    drawDate: targetDate,
-                    lastUpdated: redisData.lastUpdated ? JSON.parse(redisData.lastUpdated) : Date.now(),
-                };
-                if (!res.writableEnded) {
-                    res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
-                    res.flush();
-                    console.log(`Sent initial data for client ${clientId}: ${prizeType} = ${prizeData}, tỉnh ${province.tinh}`);
+                if (prizeData !== '...') {
+                    const data = {
+                        tinh: province.tinh,
+                        tentinh: metadata.tentinh || province.tentinh,
+                        prizeType,
+                        prizeData,
+                        year: metadata.year || new Date().getFullYear(),
+                        month: metadata.month || new Date().getMonth() + 1,
+                        drawDate: targetDate,
+                        lastUpdated: redisData.lastUpdated ? JSON.parse(redisData.lastUpdated) : Date.now(),
+                    };
+                    if (!res.writableEnded) {
+                        res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
+                        res.flush();
+                        console.log(`Sent initial data for client ${clientId}: ${prizeType} = ${prizeData}, tỉnh ${province.tinh}`);
+                    }
                 }
             }
 
             const fullData = {
-                ...redisData,
                 tinh: province.tinh,
                 tentinh: metadata.tentinh || province.tentinh,
                 year: metadata.year || new Date().getFullYear(),
@@ -261,12 +296,12 @@ router.get('/', sseLimiter, async (req, res) => {
                 drawDate: targetDate,
                 lastUpdated: redisData.lastUpdated ? JSON.parse(redisData.lastUpdated) : Date.now(),
             };
-            for (const key of Object.keys(fullData)) {
-                if (prizeTypes.includes(key)) {
-                    fullData[key] = JSON.parse(fullData[key] || '"..."');
+            for (const key of prizeTypes) {
+                if (redisData[key] && redisData[key] !== '...' && redisData[key] !== '"..."') {
+                    fullData[key] = JSON.parse(redisData[key]);
                 }
             }
-            if (!res.writableEnded) {
+            if (!res.writableEnded && Object.keys(fullData).some(key => prizeTypes.includes(key))) {
                 res.write(`event: full\ndata: ${JSON.stringify(fullData)}\n\n`);
                 res.flush();
                 console.log(`Sent SSE full data for client ${clientId}, tỉnh ${province.tinh}:`, fullData);
@@ -291,7 +326,7 @@ router.get('/', sseLimiter, async (req, res) => {
                     });
                     multi.hSet(`${key}:meta`, 'metadata', JSON.stringify({
                         ...additionalData,
-                        tentinh: additionalData.tentinh || provinces[tinh]?.tentinh || tinh,
+                        tentinh: additionalData.tentinh || selectedProvinces.find(p => p.tinh === tinh)?.tentinh || tinh,
                         tinh,
                         year: additionalData.year || new Date().getFullYear(),
                         month: additionalData.month || new Date().getMonth() + 1,
@@ -302,47 +337,31 @@ router.get('/', sseLimiter, async (req, res) => {
                     await multi.exec();
 
                     // Cập nhật cache
-                    const cacheKey = `initial:xsmt:${targetDate}`;
+                    const cacheKey = `initial:xsmt:${targetDate}:${tinh}`;
                     let cachedData = cache.get(cacheKey);
                     if (!cachedData) {
-                        cachedData = Object.values(provinces).map(province => ({
-                            eightPrizes_0: '...',
-                            sevenPrizes_0: '...',
-                            sixPrizes_0: '...',
-                            sixPrizes_1: '...',
-                            sixPrizes_2: '...',
-                            fivePrizes_0: '...',
-                            fourPrizes_0: '...',
-                            fourPrizes_1: '...',
-                            fourPrizes_2: '...',
-                            fourPrizes_3: '...',
-                            fourPrizes_4: '...',
-                            fourPrizes_5: '...',
-                            fourPrizes_6: '...',
-                            threePrizes_0: '...',
-                            threePrizes_1: '...',
-                            secondPrize_0: '...',
-                            firstPrize_0: '...',
-                            specialPrize_0: '...',
+                        cachedData = {
                             drawDate: targetDate,
                             station: 'xsmt',
-                            tentinh: province.tentinh,
-                            tinh: province.tinh,
+                            tentinh: selectedProvinces.find(p => p.tinh === tinh)?.tentinh || tinh,
+                            tinh,
                             year: new Date().getFullYear(),
                             month: new Date().getMonth() + 1,
                             dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
                             lastUpdated: 0,
-                        }));
+                        };
                     }
-                    cachedData = cachedData.map(item =>
-                        item.tinh === tinh ? { ...item, [prizeType]: prizeData, lastUpdated: Date.now() } : item
-                    );
-                    cache.set(cacheKey, cachedData, 30);
+                    cachedData = {
+                        ...cachedData,
+                        [prizeType]: prizeData,
+                        lastUpdated: Date.now(),
+                    };
+                    cache.set(cacheKey, cachedData, 15);
                     console.log(`Updated cache for ${cacheKey}, prizeType: ${prizeType}, tỉnh: ${tinh}`);
 
                     const data = {
                         tinh,
-                        tentinh: additionalData.tentinh || provinces[tinh]?.tentinh || tinh,
+                        tentinh: additionalData.tentinh || selectedProvinces.find(p => p.tinh === tinh)?.tentinh || tinh,
                         prizeType,
                         prizeData,
                         year: additionalData.year || new Date().getFullYear(),
@@ -357,29 +376,31 @@ router.get('/', sseLimiter, async (req, res) => {
                     }
 
                     const fullData = {
-                        ...await redisClient.hGetAll(key),
                         tinh,
-                        tentinh: additionalData.tentinh || provinces[tinh]?.tentinh || tinh,
+                        tentinh: additionalData.tentinh || selectedProvinces.find(p => p.tinh === tinh)?.tentinh || tinh,
                         year: additionalData.year || new Date().getFullYear(),
                         month: additionalData.month || new Date().getMonth() + 1,
                         drawDate: targetDate,
                         lastUpdated: Date.now(),
                     };
-                    for (const key of Object.keys(fullData)) {
-                        if (prizeTypes.includes(key)) {
-                            fullData[key] = JSON.parse(fullData[key] || '"..."');
+                    const redisFullData = await redisClient.hGetAll(key);
+                    for (const key of prizeTypes) {
+                        if (redisFullData[key] && redisFullData[key] !== '...' && redisFullData[key] !== '"..."') {
+                            fullData[key] = JSON.parse(redisFullData[key]);
                         }
                     }
-                    if (!res.writableEnded) {
+                    if (!res.writableEnded && Object.keys(fullData).some(key => prizeTypes.includes(key))) {
                         res.write(`event: full\ndata: ${JSON.stringify(fullData)}\n\n`);
                         res.flush();
                         console.log(`Sent SSE full data for client ${clientId}, tỉnh ${tinh}:`, fullData);
 
                         // Cập nhật cache cho sự kiện full
-                        cachedData = cachedData.map(item =>
-                            item.tinh === tinh ? { ...item, ...fullData, lastUpdated: Date.now() } : item
-                        );
-                        cache.set(cacheKey, cachedData, 30);
+                        cachedData = {
+                            ...cachedData,
+                            ...fullData,
+                            lastUpdated: Date.now(),
+                        };
+                        cache.set(cacheKey, cachedData, 15);
                         console.log(`Updated cache for ${cacheKey}, full data, tỉnh: ${tinh}`);
                     }
 
@@ -449,7 +470,7 @@ router.get('/', sseLimiter, async (req, res) => {
                         lastUpdated: JSON.stringify(Date.now()),
                     });
                     multi.hSet(`${key}:meta`, 'metadata', JSON.stringify({
-                        tentinh: provinces[tinh]?.tentinh || tinh,
+                        tentinh: selectedProvinces.find(p => p.tinh === tinh)?.tentinh || tinh,
                         tinh,
                         year: 2025,
                         month: 7,
@@ -458,7 +479,12 @@ router.get('/', sseLimiter, async (req, res) => {
                     multi.expire(key, 86400);
                     multi.expire(`${key}:meta`, 86400);
                     await multi.exec();
-                    await sendData(tinh, prizeType, mockData[prizeType], { tentinh: provinces[tinh]?.tentinh || tinh, tinh, year: 2025, month: 7 });
+                    await sendData(tinh, prizeType, mockData[prizeType], {
+                        tentinh: selectedProvinces.find(p => p.tinh === tinh)?.tentinh || tinh,
+                        tinh,
+                        year: 2025,
+                        month: 7,
+                    });
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
@@ -466,12 +492,11 @@ router.get('/', sseLimiter, async (req, res) => {
 
         if (simulate === 'true') {
             console.log(`Bắt đầu mô phỏng quay số XSMT cho ngày ${targetDate} cho client ${clientId}`);
-            for (const province of Object.values(provinces)) {
+            for (const province of selectedProvinces) {
                 await simulateLiveDraw(province.tinh);
             }
             await redisManager.release(subscriber);
             await redisManager.release(redisClient);
-            activeClients.delete(clientId);
             if (!res.writableEnded) res.end();
             return;
         }
@@ -480,9 +505,9 @@ router.get('/', sseLimiter, async (req, res) => {
         await subscriber.subscribe(channel, async (message) => {
             console.log(`Nhận Redis message XSMT cho kênh ${channel} cho client ${clientId}:`, message);
             try {
-                const { prizeType, prizeData, tentinh, tinh, year, month, drawDate } = JSON.parse(message);
-                if (tinh && prizeType && prizeData && provinces[tinh] && drawDate === targetDate) {
-                    await sendData(tinh, prizeType, prizeData, { tentinh, tinh, year, month, drawDate });
+                const { prizeType, prizeData, tentinh, tinh: msgTinh, year, month, drawDate } = JSON.parse(message);
+                if (msgTinh && prizeType && prizeData && selectedProvinces.find(p => p.tinh === msgTinh) && drawDate === targetDate) {
+                    await sendData(msgTinh, prizeType, prizeData, { tentinh, tinh: msgTinh, year, month, drawDate });
                 } else {
                     console.warn(`Dữ liệu Redis không hợp lệ cho client ${clientId}:`, message);
                     if (!res.writableEnded) {
@@ -502,18 +527,16 @@ router.get('/', sseLimiter, async (req, res) => {
         const keepAlive = setInterval(() => {
             if (res.writableEnded) {
                 clearInterval(keepAlive);
-                activeClients.delete(clientId);
                 return;
             }
-            res.write(': keep-alive\n\n');
+            res.write(`event: canary\ndata: {"message":"Keep-alive"}\n\n`);
             res.flush();
-            console.log(`Gửi keep-alive cho client XSMT ${clientId}, ngày ${targetDate}`);
-        }, 4000);
+            console.log(`Gửi canary message cho client XSMT ${clientId}, ngày ${targetDate}`);
+        }, 15000);
 
         req.on('close', async () => {
             console.log(`Client ${clientId} disconnected, scheduling cleanup in ${keepAliveTimeout / 1000}s`);
             clearInterval(keepAlive);
-            activeClients.delete(clientId);
             const cleanupTimeout = setTimeout(async () => {
                 const clientExists = await redisClient.exists(clientMetaKey);
                 if (!clientExists) {
@@ -532,7 +555,6 @@ router.get('/', sseLimiter, async (req, res) => {
         });
     } catch (error) {
         console.error(`Lỗi khi thiết lập SSE XSMT cho client ${clientId}:`, error);
-        activeClients.delete(clientId);
         if (!res.writableEnded) {
             res.write(`event: error\ndata: {"error":"Lỗi thiết lập kết nối SSE, thử lại sau."}\n\n`);
             res.flush();

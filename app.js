@@ -2,7 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const morgan = require("morgan");
-const http = require("http"); // Sử dụng http thay vì http2
+const http = require("http");
 const { default: helmet } = require("helmet");
 const compression = require("compression");
 const path = require("path");
@@ -12,7 +12,7 @@ require("dotenv").config();
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
 const app = express();
-const server = http.createServer(app); // Sử dụng http.createServer
+const server = http.createServer(app);
 
 app.set("trust proxy", 1);
 process.env.TZ = 'Asia/Ho_Chi_Minh';
@@ -29,7 +29,7 @@ app.use(
     "/uploads",
     express.static(uploadsDir, {
         setHeaders: (res, filePath) => {
-            res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "https://localhost:3000");
+            res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:3000");
         },
     })
 );
@@ -37,7 +37,7 @@ app.use(
 // Khởi tạo middleware
 app.use(
     cors({
-        origin: process.env.FRONTEND_URL || "https://localhost:3000",
+        origin: process.env.FRONTEND_URL || "http://localhost:3000",
         methods: ["GET", "POST", "DELETE", "PUT"],
         credentials: true,
     })
@@ -64,7 +64,7 @@ app.use("/webhook", telegramWebhookRouter);
 // Thiết lập webhook cho Telegram khi server khởi động
 const setTelegramWebhook = async () => {
     const token = process.env.TELEGRAM_BOT_TOKEN || "7789171652:AAEmz2GIO5WECWE2K1o-d6bve3vdvFctLCg";
-    const WEBHOOK_URL = "https://backendkqxs.onrender.com/webhook";
+    const WEBHOOK_URL = process.env.WEBHOOK_URL || "https://backendkqxs.onrender.com/webhook";
 
     try {
         const { default: fetch } = await import("node-fetch");
