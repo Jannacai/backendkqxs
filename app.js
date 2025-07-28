@@ -2,16 +2,17 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const morgan = require("morgan");
+const http = require("http"); // Sử dụng http thay vì http2
 const { default: helmet } = require("helmet");
 const compression = require("compression");
 const path = require("path");
 const routes = require("./src/routers/index");
 const fs = require("fs");
-const spdy = require("spdy");
 require("dotenv").config();
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
 const app = express();
+const server = http.createServer(app); // Sử dụng http.createServer
 
 app.set("trust proxy", 1);
 process.env.TZ = 'Asia/Ho_Chi_Minh';
@@ -28,7 +29,7 @@ app.use(
     "/uploads",
     express.static(uploadsDir, {
         setHeaders: (res, filePath) => {
-            res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:3000");
+            res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "https://localhost:3000");
         },
     })
 );
@@ -91,14 +92,5 @@ app.use((err, req, res, next) => {
     console.error("Lỗi chưa xử lý:", err.message);
     res.status(500).send("Lỗi máy chủ");
 });
-
-// Tạo server HTTP/2 với chứng chỉ SSL/TLS
-const server = spdy.createServer(
-    {
-        key: fs.readFileSync(path.join(__dirname, "certs", "server.key")),
-        cert: fs.readFileSync(path.join(__dirname, "certs", "server.crt")),
-    },
-    app
-);
 
 module.exports = { app, server };
