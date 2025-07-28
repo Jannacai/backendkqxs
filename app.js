@@ -7,7 +7,7 @@ const compression = require("compression");
 const path = require("path");
 const routes = require("./src/routers/index");
 const fs = require("fs");
-const spdy = require("spdy");
+const http2 = require("http2"); // Sử dụng module http2
 require("dotenv").config();
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
@@ -28,7 +28,7 @@ app.use(
     "/uploads",
     express.static(uploadsDir, {
         setHeaders: (res, filePath) => {
-            res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+            res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:3000");
         },
     })
 );
@@ -36,7 +36,7 @@ app.use(
 // Khởi tạo middleware
 app.use(
     cors({
-        origin: "http://localhost:3000",
+        origin: process.env.FRONTEND_URL || "http://localhost:3000",
         methods: ["GET", "POST", "DELETE", "PUT"],
         credentials: true,
     })
@@ -63,7 +63,7 @@ app.use("/webhook", telegramWebhookRouter);
 // Thiết lập webhook cho Telegram khi server khởi động
 const setTelegramWebhook = async () => {
     const token = process.env.TELEGRAM_BOT_TOKEN || "7789171652:AAEmz2GIO5WECWE2K1o-d6bve3vdvFctLCg";
-    const WEBHOOK_URL = "https://backendkqxs.onrender.com/webhook";
+    const WEBHOOK_URL = "https://backendkqxs-1.onrender.com/webhook"; // Sử dụng HTTP cho test
 
     try {
         const { default: fetch } = await import("node-fetch");
@@ -92,13 +92,7 @@ app.use((err, req, res, next) => {
     res.status(500).send("Lỗi máy chủ");
 });
 
-// Tạo server HTTP/2 với chứng chỉ SSL/TLS
-const server = spdy.createServer(
-    {
-        key: fs.readFileSync(path.join(__dirname, "certs", "server.key")),
-        cert: fs.readFileSync(path.join(__dirname, "certs", "server.crt")),
-    },
-    app
-);
+// Tạo server HTTP/2 không SSL
+const server = http2.createServer({}, app);
 
 module.exports = { app, server };

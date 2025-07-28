@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "20": "^3.1.9",
     "@sendgrid/mail": "^8.1.5",
     "@socket.io/redis-adapter": "^8.3.0",
     "abort-controller": "^3.0.0",
@@ -28,6 +29,7 @@
     "generic-pool": "^3.9.0",
     "googleapis": "^150.0.1",
     "helmet": "^8.1.0",
+    "http2-express-bridge": "^1.0.7",
     "ioredis": "^5.6.1",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
@@ -55,6 +57,7 @@
     "schedule": "^0.5.0",
     "socket.io": "^4.8.1",
     "spdy": "^4.0.2",
+    "use": "^3.1.1",
     "winston": "^3.17.0",
     "ws": "^8.18.2"
   }
