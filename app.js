@@ -9,6 +9,8 @@ const path = require("path");
 const routes = require("./src/routers/index");
 const fs = require("fs");
 require("dotenv").config();
+const { initializeWebSocket } = require("./src/websocket");
+
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
 const app = express();
@@ -16,7 +18,6 @@ const server = http.createServer(app);
 
 app.set("trust proxy", 1);
 process.env.TZ = 'Asia/Ho_Chi_Minh';
-
 // Tạo thư mục uploads nếu chưa tồn tại
 const uploadsDir = path.join(__dirname, "Uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -64,7 +65,7 @@ app.use("/webhook", telegramWebhookRouter);
 // Thiết lập webhook cho Telegram khi server khởi động
 const setTelegramWebhook = async () => {
     const token = process.env.TELEGRAM_BOT_TOKEN || "7789171652:AAEmz2GIO5WECWE2K1o-d6bve3vdvFctLCg";
-    const WEBHOOK_URL = process.env.WEBHOOK_URL || "https://backendkqxs.onrender.com/webhook";
+    const WEBHOOK_URL = "https://backendkqxs.onrender.com/webhook";
 
     try {
         const { default: fetch } = await import("node-fetch");
@@ -84,6 +85,9 @@ const setTelegramWebhook = async () => {
 // Gọi hàm thiết lập webhook khi server khởi động
 setTelegramWebhook();
 
+// Khởi tạo WebSocket
+initializeWebSocket(server);
+
 // Gắn các route khác
 routes(app);
 
@@ -91,6 +95,21 @@ routes(app);
 app.use((err, req, res, next) => {
     console.error("Lỗi chưa xử lý:", err.message);
     res.status(500).send("Lỗi máy chủ");
+});
+
+// Graceful shutdown
+const redisListener = require('./src/utils/redisListener');
+
+process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    await redisListener.stopListening();
+    process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+    console.log('SIGINT received, shutting down gracefully');
+    await redisListener.stopListening();
+    process.exit(0);
 });
 
 module.exports = { app, server };
