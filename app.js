@@ -9,7 +9,7 @@ const path = require("path");
 const routes = require("./src/routers/index");
 const fs = require("fs");
 require("dotenv").config();
-const { initializeWebSocket } = require("./src/websocket");
+// const { initializeWebSocket } = require("./src/websocket");
 
 const telegramWebhookRouter = require("./src/routers/routestelegram");
 
@@ -86,7 +86,7 @@ const setTelegramWebhook = async () => {
 setTelegramWebhook();
 
 // Khởi tạo WebSocket
-initializeWebSocket(server);
+// initializeWebSocket(server);
 
 // Gắn các route khác
 routes(app);
@@ -95,21 +95,6 @@ routes(app);
 app.use((err, req, res, next) => {
     console.error("Lỗi chưa xử lý:", err.message);
     res.status(500).send("Lỗi máy chủ");
-});
-
-// Graceful shutdown
-const redisListener = require('./src/utils/redisListener');
-
-process.on('SIGTERM', async () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    await redisListener.stopListening();
-    process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-    console.log('SIGINT received, shutting down gracefully');
-    await redisListener.stopListening();
-    process.exit(0);
 });
 
 module.exports = { app, server };

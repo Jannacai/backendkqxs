@@ -10,6 +10,7 @@ const LiveRouterMB = require('./kqxsMB/xsmbLiveRoutes');
 const LiveRouterMT = require('./kqxsMT/xsmtLiveRoutes');
 const LiveRouterMN = require('./kqxsMN/xsmnLive.routes');
 
+
 const soicauRouterMB = require('./kqxsMB/soicau.routes');
 
 const resultsRouterMN = require('./kqxsMN/resultMN.routes');
@@ -21,9 +22,6 @@ const resultsRouterMT = require('./kqxsMT/resultMT.routes');
 const calculate3D4D = require('./Dan3D4D/calculate3D4D.routes');
 const telegram = require('./routestelegram');
 
-// Import Redis listener
-const redisListener = require('../utils/redisListener');
-
 const Routes = (app) => {
     app.use('/api/kqxs/xsmb/sse', LiveRouterMB);
     app.use('/api/ketquaxs/xsmt/sse', LiveRouterMT);
@@ -33,6 +31,7 @@ const Routes = (app) => {
     app.use('/api/ketquaxs', resultsRouterMT);
     app.use('/api/kqxs/xsmb/soicau', soicauRouterMB);
 
+
     // app.use('/api/posts', postsRouter);
     // app.use('/api/stats', statsRouter);
     app.use('/api/taodan', calculate3D4D);
@@ -40,14 +39,6 @@ const Routes = (app) => {
         console.log('Yêu cầu đến /api/kqxs/xsmb/telegram:', req.method, req.url, req.body);
         next();
     }, telegram);
-
-    // Start Redis listener for realtime updates
-    console.log('=== STARTING REDIS LISTENER FROM ROUTES ===');
-    redisListener.startListening().then(() => {
-        console.log('=== REDIS LISTENER STARTED SUCCESSFULLY FROM ROUTES ===');
-    }).catch(error => {
-        console.error('=== ERROR STARTING REDIS LISTENER FROM ROUTES ===', error);
-    });
 };
 
 module.exports = Routes;

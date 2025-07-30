@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const redis = require('redis');
-const { broadcastLotteryUpdate, broadcastLotteryError, getLotterySubscribersCount } = require('../../websocket');
 
+// Kết nối Redis
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
 
+// Hàm retry cho thao tác Redis
 const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
     let lastError;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -23,6 +24,7 @@ const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
     throw lastError;
 };
 
+// Kết nối Redis với retry
 const connectRedis = async () => {
     if (!redisClient.isOpen) {
         await retryOperation(() => redisClient.connect(), 3, 1000);
@@ -30,12 +32,22 @@ const connectRedis = async () => {
 };
 connectRedis().catch(err => console.error('Lỗi kết nối Redis:', err));
 
+// Rate limiter cho SSE
+const sseLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5000,
+    message: 'Quá nhiều yêu cầu SSE từ IP này, vui lòng thử lại sau.',
+    keyGenerator: (req) => req.ip,
+});
+
+// Rate limiter cho các endpoint thông thường
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 300,
     message: { error: 'Quá nhiều yêu cầu API, vui lòng thử lại sau một phút.' },
 });
 
+// Danh sách tỉnh theo ngày
 const provincesByDay = {
     0: { 'kon-tum': { tentinh: 'Kon Tum', tinh: 'kon-tum' }, 'khanh-hoa': { tentinh: 'Khánh Hòa', tinh: 'khanh-hoa' }, 'hue': { tentinh: 'Thừa Thiên Huế', tinh: 'hue' } },
     1: { 'phu-yen': { tentinh: 'Phú Yên', tinh: 'phu-yen' }, 'hue': { tentinh: 'Thừa Thiên Huế', tinh: 'hue' } },
@@ -46,6 +58,15 @@ const provincesByDay = {
     6: { 'da-nang': { tentinh: 'Đà Nẵng', tinh: 'da-nang' }, 'quang-ngai': { tentinh: 'Quảng Ngãi', tinh: 'quang-ngai' }, 'dak-nong': { tentinh: 'Đắk Nông', tinh: 'dak-nong' } },
 };
 
+// Hàm kiểm tra thời gian khởi tạo initialData
+const isInitialTime = () => {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    return hours === 17 && minutes >= 10 && minutes < 15; // 17:10–17:15
+};
+
+// Hàm parse ngày
 const parseDate = (dateStr) => {
     if (!dateStr || !/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
         throw new Error('Định dạng ngày không hợp lệ. Vui lòng sử dụng DD-MM-YYYY.');
@@ -57,26 +78,22 @@ const parseDate = (dateStr) => {
     return new Date(year, month - 1, day);
 };
 
+// Endpoint lấy trạng thái ban đầu
 router.get('/initial', apiLimiter, async (req, res) => {
     try {
-        const { date, station = 'xsmt', tinh } = req.query;
+        const { date, station, tinh } = req.query;
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? date
             : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-        const province = provincesByDay[new Date(parseDate(targetDate)).getDay()]?.[tinh];
+        const province = provincesByDay[new Date().getDay()]?.[tinh] || provincesByDay[6]?.[tinh];
         if (!province || !tinh) {
             return res.status(400).json({ error: 'Tỉnh không hợp lệ hoặc không được cung cấp.' });
         }
 
-        let existingData = await redisClient.hGetAll(`kqxs:${station}:${targetDate}:${tinh}`);
-        const latestData = await redisClient.get(`kqxs:${station}:${targetDate}:${tinh}:latest`);
-        const metadata = JSON.parse((await redisClient.hGet(`kqxs:${station}:${targetDate}:${tinh}:meta`, 'metadata')) || '{}');
-
-        console.log(`Debug - Redis keys for kqxs:${station}:${targetDate}:${tinh}:`);
-        console.log(`existingData keys:`, Object.keys(existingData));
-        console.log(`existingData values:`, existingData);
-        console.log(`latestData exists:`, !!latestData);
-        console.log(`metadata:`, metadata);
+        // Lấy dữ liệu từ Redis
+        let existingData = await redisClient.hGetAll(`kqxs:xsmt:${targetDate}:${tinh}`);
+        const latestData = await redisClient.get(`kqxs:xsmt:${targetDate}:${tinh}:latest`);
+        const metadata = JSON.parse((await redisClient.hGet(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 'metadata')) || '{}');
 
         const initialData = {
             eightPrizes_0: '...',
@@ -98,7 +115,7 @@ router.get('/initial', apiLimiter, async (req, res) => {
             firstPrize_0: '...',
             specialPrize_0: '...',
             drawDate: targetDate,
-            station,
+            station: station || 'xsmt',
             tentinh: province.tentinh,
             tinh: province.tinh,
             year: metadata.year || new Date().getFullYear(),
@@ -107,107 +124,55 @@ router.get('/initial', apiLimiter, async (req, res) => {
             lastUpdated: metadata.lastUpdated || 0,
         };
 
-        // Ưu tiên đọc từ existingData trước
-        if (existingData && Object.keys(existingData).length > 0) {
-            console.log(`Reading from existingData for kqxs:${station}:${targetDate}:${tinh}:`, existingData);
-            for (const key of Object.keys(existingData)) {
-                if (initialData.hasOwnProperty(key)) {
-                    try {
-                        const parsedValue = JSON.parse(existingData[key]);
-                        initialData[key] = parsedValue;
-                        console.log(`Set ${key} = ${parsedValue}`);
-                    } catch (e) {
-                        console.error(`Error parsing Redis data for kqxs:${station}:${targetDate}:${tinh}, key ${key}:`, e);
-                        initialData[key] = existingData[key];
-                    }
+        if (latestData) {
+            const parsedLatest = JSON.parse(latestData);
+            for (const key of Object.keys(parsedLatest)) {
+                if (initialData[key]) {
+                    initialData[key] = parsedLatest[key];
                 }
             }
-        } else if (latestData) {
-            // Nếu không có existingData, thử đọc từ latestData
-            try {
-                const parsedLatest = JSON.parse(latestData);
-                console.log(`Reading from latestData for kqxs:${station}:${targetDate}:${tinh}:`, parsedLatest);
-                for (const key of Object.keys(parsedLatest)) {
-                    if (initialData.hasOwnProperty(key)) {
-                        initialData[key] = parsedLatest[key];
-                    }
+            initialData.lastUpdated = parsedLatest.lastUpdated || Date.now();
+        } else {
+            for (const key of Object.keys(existingData)) {
+                if (initialData[key]) {
+                    initialData[key] = JSON.parse(existingData[key]);
                 }
-                initialData.lastUpdated = parsedLatest.lastUpdated || Date.now();
-            } catch (e) {
-                console.error(`Error parsing latestData for kqxs:${station}:${targetDate}:${tinh}:`, e);
             }
         }
 
-        console.log(`Final initial data for kqxs:${station}:${targetDate}:${tinh}:`, initialData);
+        console.log(`Gửi dữ liệu khởi tạo XSMT cho ngày ${targetDate}, tỉnh ${tinh}:`, initialData);
         res.status(200).json(initialData);
     } catch (error) {
-        console.error('Error fetching initial state from Redis:', error);
+        console.error('Lỗi khi lấy trạng thái ban đầu từ Redis:', error);
         res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
     }
 });
 
-// Endpoint cập nhật kết quả xổ số (thay thế SSE)
-router.post('/update', apiLimiter, async (req, res) => {
+// Endpoint SSE chính
+router.get('/', sseLimiter, async (req, res) => {
     try {
-        const { station = 'xsmt', date, tinh, prizeType, prizeData, additionalData = {} } = req.body;
-
-        console.log(`=== REALTIME UPDATE REQUEST ===`);
-        console.log(`Station: ${station}`);
-        console.log(`Date: ${date}`);
-        console.log(`Tinh: ${tinh}`);
-        console.log(`Prize Type: ${prizeType}`);
-        console.log(`Prize Data: ${prizeData}`);
-        console.log(`Additional Data:`, additionalData);
-
+        const { date, station, tinh, simulate } = req.query;
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? date
             : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-
-        const province = provincesByDay[new Date(parseDate(targetDate)).getDay()]?.[tinh];
-        if (!province || !tinh || !prizeType || !prizeData) {
-            console.error(`Invalid update request:`, { province, tinh, prizeType, prizeData });
-            return res.status(400).json({ error: 'Dữ liệu không hợp lệ.' });
+        const province = provincesByDay[new Date().getDay()]?.[tinh] || provincesByDay[6]?.[tinh];
+        if (!province || !tinh) {
+            return res.status(400).end('Tỉnh không hợp lệ hoặc không được cung cấp.');
         }
+        const isSimulate = simulate === 'true';
+        console.log('SSE XSMT:', { targetDate, station, tinh, isSimulate });
 
-        console.log(`Province found:`, province);
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('Content-Encoding', 'identity');
+        res.flushHeaders();
 
-        // Cập nhật Redis
-        await redisClient.hSet(`kqxs:${station}:${targetDate}:${tinh}`, prizeType, JSON.stringify(prizeData));
-        await redisClient.hSet(`kqxs:${station}:${targetDate}:${tinh}:meta`, 'metadata', JSON.stringify({
-            ...additionalData,
-            lastUpdated: Date.now(),
-        }));
-        await redisClient.expire(`kqxs:${station}:${targetDate}:${tinh}`, 86400);
-        await redisClient.expire(`kqxs:${station}:${targetDate}:${tinh}:meta`, 86400);
+        res.write('event: canary\ndata: {"message":"Connection established"}\n\n');
+        res.flush();
+        console.log(`Gửi canary message cho client XSMT, ngày ${targetDate}, tỉnh ${tinh}`);
 
-        // Publish to Redis channel for realtime updates
-        const publishData = {
-            station,
-            date: targetDate,
-            tinh,
-            prizeType,
-            prizeData,
-            timestamp: Date.now()
-        };
-
-        console.log(`=== PUBLISHING TO REDIS CHANNEL ===`);
-        console.log(`Channel: lottery:${station}:updates`);
-        console.log(`Data:`, publishData);
-
-        await redisClient.publish(`lottery:${station}:updates`, JSON.stringify(publishData));
-        console.log(`Successfully published to Redis channel: lottery:${station}:updates`);
-
-        // Cập nhật dữ liệu mới nhất
-        let latestData = await redisClient.get(`kqxs:${station}:${targetDate}:${tinh}:latest`);
-        let fullData = latestData ? JSON.parse(latestData) : {
-            drawDate: targetDate,
-            station,
-            tentinh: province.tentinh,
-            tinh: province.tinh,
-            year: additionalData.year || new Date().getFullYear(),
-            month: additionalData.month || new Date().getMonth() + 1,
-            dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
-            lastUpdated: 0,
+        const initialData = {
             eightPrizes_0: '...',
             sevenPrizes_0: '...',
             sixPrizes_0: '...',
@@ -226,67 +191,112 @@ router.post('/update', apiLimiter, async (req, res) => {
             secondPrize_0: '...',
             firstPrize_0: '...',
             specialPrize_0: '...',
+            drawDate: targetDate,
+            station: station || 'xsmt',
+            tentinh: province.tentinh,
+            tinh: province.tinh,
+            year: new Date().getFullYear(),
+            month: new Date().getMonth() + 1,
+            dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
+            lastUpdated: Date.now(),
         };
-        fullData[prizeType] = prizeData;
-        fullData.lastUpdated = Date.now();
 
-        await redisClient.set(`kqxs:${station}:${targetDate}:${tinh}:latest`, JSON.stringify(fullData));
-        await redisClient.expire(`kqxs:${station}:${targetDate}:${tinh}:latest`, 86400);
+        // Lấy dữ liệu thực tế từ Redis
+        let existingData = await redisClient.hGetAll(`kqxs:xsmt:${targetDate}:${tinh}`);
+        const latestData = await redisClient.get(`kqxs:xsmt:${targetDate}:${tinh}:latest`);
+        const metadata = JSON.parse((await redisClient.hGet(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 'metadata')) || '{}');
 
-        // Broadcast qua WebSocket - gửi dạng mảng để khớp với client
-        const broadcastData = [fullData];
-        console.log(`=== BROADCASTING REALTIME UPDATE ===`);
-        console.log(`Broadcast data:`, broadcastData);
-        console.log(`Broadcast data length:`, broadcastData.length);
-        console.log(`Broadcast data structure:`, broadcastData.map(item => ({
-            tinh: item.tinh,
-            tentinh: item.tentinh,
-            [prizeType]: item[prizeType]
-        })));
-
-        await broadcastLotteryUpdate(station, targetDate, broadcastData);
-
-        console.log(`Updated kqxs result: ${prizeType} = ${prizeData} for ${station}:${targetDate}:${tinh}`);
-        res.status(200).json({ success: true, message: 'Cập nhật thành công' });
-    } catch (error) {
-        console.error('Error updating kqxs result:', error);
-        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
-    }
-});
-
-router.get('/stats', apiLimiter, async (req, res) => {
-    try {
-        const { station = 'xsmt', date } = req.query;
-        const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
-            ? date
-            : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-
-        const subscribersCount = getLotterySubscribersCount(station, targetDate);
-
-        res.status(200).json({
-            station,
-            date: targetDate,
-            subscribersCount,
-            timestamp: Date.now()
-        });
-    } catch (error) {
-        console.error('Error fetching stats:', error);
-        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
-    }
-});
-
-// Endpoint mô phỏng quay số (cho testing)
-router.post('/simulate', apiLimiter, async (req, res) => {
-    try {
-        const { station = 'xsmt', date, tinh } = req.body;
-        const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
-            ? date
-            : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-
-        const province = provincesByDay[new Date(parseDate(targetDate)).getDay()]?.[tinh];
-        if (!province || !tinh) {
-            return res.status(400).json({ error: 'Tỉnh không hợp lệ.' });
+        if (latestData) {
+            const parsedLatest = JSON.parse(latestData);
+            for (const key of Object.keys(parsedLatest)) {
+                if (initialData[key]) {
+                    initialData[key] = parsedLatest[key];
+                }
+            }
+            initialData.lastUpdated = parsedLatest.lastUpdated || Date.now();
+        } else {
+            for (const key of Object.keys(existingData)) {
+                if (initialData[key]) {
+                    initialData[key] = JSON.parse(existingData[key]);
+                }
+            }
         }
+
+        // Gửi dữ liệu ban đầu cho client
+        const prizeTypes = [
+            'eightPrizes_0', 'sevenPrizes_0',
+            'sixPrizes_0', 'sixPrizes_1', 'sixPrizes_2',
+            'fivePrizes_0',
+            'fourPrizes_0', 'fourPrizes_1', 'fourPrizes_2', 'fourPrizes_3', 'fourPrizes_4', 'fourPrizes_5', 'fourPrizes_6',
+            'threePrizes_0', 'threePrizes_1',
+            'secondPrize_0', 'firstPrize_0', 'specialPrize_0'
+        ];
+        for (const prizeType of prizeTypes) {
+            const prizeData = initialData[prizeType];
+            const data = {
+                [prizeType]: prizeData,
+                drawDate: targetDate,
+                tentinh: metadata.tentinh || province.tentinh,
+                tinh: metadata.tinh || province.tinh,
+                year: metadata.year || new Date().getFullYear(),
+                month: metadata.month || new Date().getMonth() + 1,
+                lastUpdated: initialData.lastUpdated,
+            };
+            res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
+            res.flush();
+            console.log(`Gửi dữ liệu ban đầu XSMT từ kho: ${prizeType} = ${prizeData}, tỉnh ${tinh}`);
+        }
+
+        const sendData = async (prizeType, prizeData, additionalData = {}) => {
+            try {
+                if (prizeData === '...') {
+                    const currentData = await redisClient.hGet(`kqxs:xsmt:${targetDate}:${tinh}`, prizeType);
+                    if (currentData && JSON.parse(currentData) !== '...') {
+                        console.warn(`Bỏ qua ghi ${prizeType} = "..." vì đã có giá trị: ${currentData}`);
+                        return;
+                    }
+                }
+                const data = {
+                    [prizeType]: prizeData,
+                    drawDate: targetDate,
+                    tentinh: additionalData.tentinh || province.tentinh,
+                    tinh: additionalData.tinh || province.tinh,
+                    year: additionalData.year || new Date().getFullYear(),
+                    month: additionalData.month || new Date().getMonth() + 1,
+                    lastUpdated: Date.now(),
+                };
+                await redisClient.hSet(`kqxs:xsmt:${targetDate}:${tinh}`, prizeType, JSON.stringify(prizeData));
+                await redisClient.hSet(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 'metadata', JSON.stringify({
+                    ...additionalData,
+                    lastUpdated: data.lastUpdated,
+                }));
+                await redisClient.expire(`kqxs:xsmt:${targetDate}:${tinh}`, 86400);
+                await redisClient.expire(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 86400);
+
+                let latestData = await redisClient.get(`kqxs:xsmt:${targetDate}:${tinh}:latest`);
+                let fullData = latestData ? JSON.parse(latestData) : { ...initialData };
+                fullData[prizeType] = prizeData;
+                fullData.lastUpdated = data.lastUpdated;
+                fullData.tentinh = data.tentinh;
+                fullData.tinh = data.tinh;
+                fullData.year = data.year;
+                fullData.month = data.month;
+                await redisClient.set(`kqxs:xsmt:${targetDate}:${tinh}:latest`, JSON.stringify(fullData));
+                await redisClient.expire(`kqxs:xsmt:${targetDate}:${tinh}:latest`, 86400);
+
+                res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
+                res.flush();
+                console.log(`Gửi SSE XSMT: ${prizeType} = ${prizeData} cho ngày ${targetDate}, tỉnh ${tinh}`);
+
+                if (prizeType === 'sixPrizes_1') {
+                    res.write(`event: full\ndata: ${JSON.stringify(fullData)}\n\n`);
+                    res.flush();
+                    console.log(`Gửi SSE full XSMT cho ngày ${targetDate}, tỉnh ${tinh}:`, fullData);
+                }
+            } catch (error) {
+                console.error(`Lỗi gửi SSE XSMT (${prizeType}):`, error);
+            }
+        };
 
         const mockData = {
             eightPrizes_0: '12',
@@ -308,111 +318,100 @@ router.post('/simulate', apiLimiter, async (req, res) => {
             firstPrize_0: '34567',
             specialPrize_0: '12345',
             lastUpdated: Date.now(),
-            drawDate: targetDate,
-            station,
-            tentinh: province.tentinh,
-            tinh: province.tinh,
-            year: new Date().getFullYear(),
-            month: new Date().getMonth() + 1,
-            dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
         };
 
-        // Broadcast dữ liệu mô phỏng dạng mảng
-        const broadcastData = [mockData];
-        await broadcastLotteryUpdate(station, targetDate, broadcastData);
-
-        console.log(`Simulated kqxs for ${station}:${targetDate}:${tinh}`);
-        res.status(200).json({ success: true, message: 'Mô phỏng thành công' });
-    } catch (error) {
-        console.error('Error simulating kqxs:', error);
-        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
-    }
-});
-
-router.get('/check-and-broadcast', apiLimiter, async (req, res) => {
-    try {
-        const { station = 'xsmt', date } = req.query;
-        const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
-            ? date
-            : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-        const dayOfWeek = new Date(parseDate(targetDate)).getDay();
-        const provinces = Object.keys(provincesByDay[dayOfWeek] || provincesByDay[6]);
-
-        const data = await Promise.all(provinces.map(async (tinh) => {
-            const redisKey = `kqxs:${station}:${targetDate}:${tinh}`;
-            const existingData = await redisClient.hGetAll(redisKey);
-            const latestData = await redisClient.get(`${redisKey}:latest`);
-            const province = provincesByDay[dayOfWeek]?.[tinh] || provincesByDay[6]?.[tinh];
-            let result = {
-                drawDate: targetDate,
-                station,
-                tentinh: province.tentinh,
-                tinh: province.tinh,
-                year: new Date().getFullYear(),
-                month: new Date().getMonth() + 1,
-                dayOfWeek: new Date(parseDate(targetDate)).toLocaleString('vi-VN', { weekday: 'long' }),
-                lastUpdated: 0,
-                eightPrizes_0: '...',
-                sevenPrizes_0: '...',
-                sixPrizes_0: '...',
-                sixPrizes_1: '...',
-                sixPrizes_2: '...',
-                fivePrizes_0: '...',
-                fourPrizes_0: '...',
-                fourPrizes_1: '...',
-                fourPrizes_2: '...',
-                fourPrizes_3: '...',
-                fourPrizes_4: '...',
-                fourPrizes_5: '...',
-                fourPrizes_6: '...',
-                threePrizes_0: '...',
-                threePrizes_1: '...',
-                secondPrize_0: '...',
-                firstPrize_0: '...',
-                specialPrize_0: '...',
-            };
-
-            // Ưu tiên đọc từ existingData trước
-            if (existingData && Object.keys(existingData).length > 0) {
-                console.log(`Reading from existingData for ${redisKey}:`, existingData);
-                for (const key of Object.keys(existingData)) {
-                    if (result.hasOwnProperty(key)) {
-                        try {
-                            const parsedValue = JSON.parse(existingData[key]);
-                            result[key] = parsedValue;
-                        } catch (e) {
-                            console.error(`Error parsing Redis data for ${redisKey}, key ${key}:`, e);
-                            result[key] = existingData[key];
-                        }
-                    }
-                }
-            } else if (latestData) {
-                // Nếu không có existingData, thử đọc từ latestData
-                try {
-                    const parsedLatest = JSON.parse(latestData);
-                    console.log(`Reading from latestData for ${redisKey}:`, parsedLatest);
-                    for (const key of Object.keys(parsedLatest)) {
-                        if (result.hasOwnProperty(key)) {
-                            result[key] = parsedLatest[key];
-                        }
-                    }
-                    result.lastUpdated = parsedLatest.lastUpdated || Date.now();
-                } catch (e) {
-                    console.error(`Error parsing latestData for ${redisKey}:`, e);
+        const simulateLiveDraw = async (data) => {
+            const prizeOrder = [
+                { key: 'eightPrizes_0', delay: 500 },
+                { key: 'sevenPrizes_0', delay: 500 },
+                { key: 'sixPrizes_0', delay: 500 },
+                { key: 'sixPrizes_1', delay: 500 },
+                { key: 'sixPrizes_2', delay: 500 },
+                { key: 'fivePrizes_0', delay: 500 },
+                { key: 'fourPrizes_0', delay: 500 },
+                { key: 'fourPrizes_1', delay: 500 },
+                { key: 'fourPrizes_2', delay: 500 },
+                { key: 'fourPrizes_3', delay: 500 },
+                { key: 'fourPrizes_4', delay: 500 },
+                { key: 'fourPrizes_5', delay: 500 },
+                { key: 'fourPrizes_6', delay: 500 },
+                { key: 'threePrizes_0', delay: 500 },
+                { key: 'threePrizes_1', delay: 500 },
+                { key: 'secondPrize_0', delay: 500 },
+                { key: 'firstPrize_0', delay: 500 },
+                { key: 'specialPrize_0', delay: 500 },
+            ];
+            for (const { key, delay } of prizeOrder) {
+                if (data[key]) {
+                    await sendData(key, data[key], { tentinh: province.tentinh, tinh: province.tinh, year: 2025, month: 6 });
+                    await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
+        };
 
-            console.log(`Broadcast data for ${redisKey}:`, result);
-            return result;
-        }));
+        if (isSimulate) {
+            console.log(`Bắt đầu mô phỏng quay số XSMT cho ngày ${targetDate}, tỉnh ${tinh}`);
+            await simulateLiveDraw(mockData);
+            res.end();
+            return;
+        }
 
-        // Broadcast dữ liệu dạng mảng
-        await broadcastLotteryUpdate(station, targetDate, data);
-        console.log(`Broadcasted LOTTERY_INITIAL for ${station}:${targetDate}:`, data);
-        res.status(200).json({ success: true, message: 'Broadcasted initial data' });
+        const subscriber = redis.createClient({ url: process.env.REDIS_URL });
+        let retryCount = 0;
+        const maxRetries = 5;
+        const retryDelay = 4000;
+
+        const connectSubscriber = async () => {
+            try {
+                await subscriber.connect();
+                console.log(`Đã kết nối Redis subscriber cho kênh xsmt:${targetDate}:${tinh}`);
+                await subscriber.subscribe(`xsmt:${targetDate}:${tinh}`, async (message) => {
+                    console.log('Nhận Redis message XSMT:', message);
+                    try {
+                        const { prizeType, prizeData, tentinh, tinh, year, month } = JSON.parse(message);
+                        if (prizeType && prizeData) {
+                            await sendData(prizeType, prizeData, { tentinh, tinh, year, month });
+                            retryCount = 0;
+                        } else {
+                            console.warn('Dữ liệu Redis không hợp lệ:', message);
+                        }
+                    } catch (error) {
+                        console.error('Lỗi xử lý Redis message XSMT:', error);
+                    }
+                });
+            } catch (error) {
+                console.error('Lỗi kết nối Redis subscriber:', error);
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`Thử kết nối lại Redis subscriber (lần ${retryCount}/${maxRetries}) sau ${retryDelay}ms`);
+                    setTimeout(connectSubscriber, retryDelay);
+                } else {
+                    console.error('Hết số lần thử kết nối Redis subscriber');
+                }
+            }
+        };
+
+        await connectSubscriber();
+
+        const keepAlive = setInterval(() => {
+            if (res.writableEnded) {
+                clearInterval(keepAlive);
+                return;
+            }
+            res.write(': keep-alive\n\n');
+            res.flush();
+            console.log(`Gửi keep-alive cho client XSMT, ngày ${targetDate}, tỉnh ${tinh}`);
+        }, 4000);
+
+        req.on('close', async () => {
+            clearInterval(keepAlive);
+            await subscriber.quit();
+            res.end();
+            console.log(`Client ngắt kết nối SSE XSMT cho tỉnh ${tinh}`);
+        });
     } catch (error) {
-        console.error('Error checking and broadcasting:', error);
-        res.status(500).json({ error: 'Lỗi server' });
+        console.error('Lỗi khi thiết lập SSE XSMT:', error);
+        res.status(500).end();
     }
 });
 
