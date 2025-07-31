@@ -1,12 +1,86 @@
 const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
-const redis = require('redis');
+const redisManager = require('../../utils/redisMT');
 
-// Kết nối Redis
-const redisClient = redis.createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379',
-});
+// Global SSE connections manager để tránh memory leaks
+const sseConnections = new Map(); // { `${date}:${tinh}`: Set<res> }
+const redisCheckIntervals = new Map(); // { `${date}:${tinh}`: intervalId }
+const connectionStats = new Map(); // { `${date}:${tinh}`: { count: number, lastActivity: number } }
+
+// Hàm monitoring connections
+const monitorConnections = () => {
+    const now = Date.now();
+    const timeout = 5 * 60 * 1000; // 5 phút
+
+    for (const [key, stats] of connectionStats.entries()) {
+        if (now - stats.lastActivity > timeout) {
+            console.log(`🧹 Cleanup inactive connection: ${key}`);
+            const connections = sseConnections.get(key);
+            if (connections) {
+                connections.clear();
+                sseConnections.delete(key);
+            }
+            connectionStats.delete(key);
+        }
+    }
+};
+
+// Chạy monitoring mỗi phút
+setInterval(monitorConnections, 60000);
+
+// Hàm broadcast SSE cho tất cả client của một tỉnh với batch processing
+const broadcastSSE = (date, tinh, eventType, data) => {
+    const connectionKey = `${date}:${tinh}`;
+    const connections = sseConnections.get(connectionKey);
+
+    if (connections && connections.size > 0) {
+        const message = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+        let sentCount = 0;
+        const failedConnections = [];
+
+        // Batch processing để tối ưu performance
+        const batchSize = 50;
+        const connectionArray = Array.from(connections);
+
+        for (let i = 0; i < connectionArray.length; i += batchSize) {
+            const batch = connectionArray.slice(i, i + batchSize);
+
+            batch.forEach(res => {
+                try {
+                    if (!res.writableEnded) {
+                        res.write(message);
+                        res.flush();
+                        sentCount++;
+                    } else {
+                        failedConnections.push(res);
+                    }
+                } catch (error) {
+                    console.error(`❌ Lỗi gửi SSE cho client:`, error);
+                    failedConnections.push(res);
+                }
+            });
+
+            // Small delay giữa các batch để tránh blocking
+            if (i + batchSize < connectionArray.length) {
+                setImmediate(() => { });
+            }
+        }
+
+        // Cleanup failed connections
+        failedConnections.forEach(res => {
+            connections.delete(res);
+        });
+
+        // Update stats
+        connectionStats.set(connectionKey, {
+            count: connections.size,
+            lastActivity: Date.now()
+        });
+
+        console.log(`📡 Broadcast SSE: ${eventType} cho ${sentCount}/${connections.size} clients của ${tinh}`);
+    }
+};
 
 // Hàm retry cho thao tác Redis
 const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
@@ -26,25 +100,29 @@ const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
 
 // Kết nối Redis với retry
 const connectRedis = async () => {
-    if (!redisClient.isOpen) {
-        await retryOperation(() => redisClient.connect(), 3, 1000);
+    try {
+        await redisManager.getClient();
+    } catch (error) {
+        console.error('❌ Lỗi kết nối Redis:', error);
     }
 };
 connectRedis().catch(err => console.error('Lỗi kết nối Redis:', err));
 
-// Rate limiter cho SSE
+// Rate limiter tối ưu cho 200+ client
 const sseLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5000,
+    windowMs: 15 * 60 * 1000, // 15 phút
+    max: 10000, // Tăng limit cho nhiều client
     message: 'Quá nhiều yêu cầu SSE từ IP này, vui lòng thử lại sau.',
     keyGenerator: (req) => req.ip,
+    skipSuccessfulRequests: true, // Bỏ qua successful requests
 });
 
 // Rate limiter cho các endpoint thông thường
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 300,
+    max: 1000, // Tăng limit
     message: { error: 'Quá nhiều yêu cầu API, vui lòng thử lại sau một phút.' },
+    skipSuccessfulRequests: true,
 });
 
 // Danh sách tỉnh theo ngày
@@ -78,22 +156,120 @@ const parseDate = (dateStr) => {
     return new Date(year, month - 1, day);
 };
 
+// Hàm quản lý Redis checking cho từng tỉnh
+const setupRedisChecking = (date, tinh, province) => {
+    const connectionKey = `${date}:${tinh}`;
+
+    // Nếu đã có interval cho tỉnh này, không tạo mới
+    if (redisCheckIntervals.has(connectionKey)) {
+        return;
+    }
+
+    let lastSentData = new Set();
+    let lastCleanupTime = Date.now();
+    const CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 phút cleanup một lần
+
+    const checkRedisChanges = async () => {
+        try {
+            // Cleanup lastSentData định kỳ để tránh memory leak
+            const now = Date.now();
+            if (now - lastCleanupTime > CLEANUP_INTERVAL) {
+                lastSentData.clear();
+                lastCleanupTime = now;
+                console.log(`🧹 Cleanup lastSentData cho ${tinh}`);
+            }
+
+            const currentData = await redisManager.getAllHashData(`kqxs:xsmt:${date}:${tinh}`);
+
+            if (Object.keys(currentData).length === 0) return;
+
+            // So sánh với dữ liệu hiện tại và broadcast SSE nếu có thay đổi
+            for (const [key, value] of Object.entries(currentData)) {
+                const parsedValue = JSON.parse(value);
+                const dataKey = `${key}:${parsedValue}`;
+
+                if (parsedValue !== '...' && parsedValue !== '***' && !lastSentData.has(dataKey)) {
+                    console.log(`📡 Phát hiện thay đổi Redis: ${key} = ${parsedValue} cho ${tinh}`);
+
+                    const sseData = {
+                        [key]: parsedValue,
+                        drawDate: date,
+                        tentinh: province.tentinh,
+                        tinh: province.tinh,
+                        year: new Date().getFullYear(),
+                        month: new Date().getMonth() + 1,
+                        lastUpdated: Date.now(),
+                    };
+
+                    // Broadcast cho tất cả client của tỉnh này
+                    broadcastSSE(date, tinh, key, sseData);
+                    lastSentData.add(dataKey);
+                }
+            }
+        } catch (error) {
+            console.error(`❌ Lỗi kiểm tra Redis changes cho ${tinh}:`, error);
+            // Thử reconnect Redis nếu cần
+            if (error.message.includes('ECONNRESET') || error.message.includes('ENOTFOUND')) {
+                console.log(`🔄 Thử reconnect Redis cho ${tinh}`);
+                connectRedis().catch(err => console.error('Lỗi reconnect Redis:', err));
+            }
+        }
+    };
+
+    // Kiểm tra thay đổi mỗi 2 giây
+    const intervalId = setInterval(checkRedisChanges, 2000);
+    redisCheckIntervals.set(connectionKey, intervalId);
+
+    console.log(`🔧 Thiết lập Redis checking cho ${tinh} (${date})`);
+};
+
 // Endpoint lấy trạng thái ban đầu
 router.get('/initial', apiLimiter, async (req, res) => {
     try {
         const { date, station, tinh } = req.query;
+        console.log('📡 /initial request:', { date, station, tinh });
+
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? date
             : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-        const province = provincesByDay[new Date().getDay()]?.[tinh] || provincesByDay[6]?.[tinh];
+
+        // Sử dụng ngày được yêu cầu để xác định tỉnh thay vì ngày hiện tại
+        const targetDateObj = parseDate(targetDate);
+        const dayOfWeek = targetDateObj.getDay();
+        const province = provincesByDay[dayOfWeek]?.[tinh] || provincesByDay[6]?.[tinh];
+
+        console.log('🔍 /initial - Xác định tỉnh:', {
+            targetDate,
+            dayOfWeek,
+            tinh,
+            province,
+            availableProvinces: provincesByDay[dayOfWeek] ? Object.keys(provincesByDay[dayOfWeek]) : []
+        });
+
         if (!province || !tinh) {
+            console.warn('⚠️ Tỉnh không hợp lệ cho /initial:', { tinh, province, dayOfWeek });
             return res.status(400).json({ error: 'Tỉnh không hợp lệ hoặc không được cung cấp.' });
         }
 
-        // Lấy dữ liệu từ Redis
-        let existingData = await redisClient.hGetAll(`kqxs:xsmt:${targetDate}:${tinh}`);
-        const latestData = await redisClient.get(`kqxs:xsmt:${targetDate}:${tinh}:latest`);
-        const metadata = JSON.parse((await redisClient.hGet(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 'metadata')) || '{}');
+        console.log('🔍 Lấy dữ liệu từ Redis cho:', { targetDate, tinh });
+
+        // Lấy dữ liệu từ Redis với Promise.all để tối ưu
+        const [existingData, latestData, metadataStr] = await Promise.all([
+            redisManager.getAllHashData(`kqxs:xsmt:${targetDate}:${tinh}`),
+            redisManager.getData(`kqxs:xsmt:${targetDate}:${tinh}:latest`),
+            redisManager.getHashData(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 'metadata')
+        ]).catch(error => {
+            console.error('❌ Lỗi Redis operations:', error);
+            // Fallback values
+            return [{}, null, '{}'];
+        });
+
+        const metadata = JSON.parse(metadataStr || '{}');
+        console.log('📊 Dữ liệu Redis:', {
+            existingDataKeys: Object.keys(existingData),
+            hasLatestData: !!latestData,
+            metadata
+        });
 
         const initialData = {
             eightPrizes_0: '...',
@@ -126,6 +302,7 @@ router.get('/initial', apiLimiter, async (req, res) => {
 
         if (latestData) {
             const parsedLatest = JSON.parse(latestData);
+            console.log('📡 Sử dụng latest data cho', tinh, parsedLatest);
             for (const key of Object.keys(parsedLatest)) {
                 if (initialData[key]) {
                     initialData[key] = parsedLatest[key];
@@ -133,6 +310,7 @@ router.get('/initial', apiLimiter, async (req, res) => {
             }
             initialData.lastUpdated = parsedLatest.lastUpdated || Date.now();
         } else {
+            console.log('📡 Sử dụng existing data cho', tinh);
             for (const key of Object.keys(existingData)) {
                 if (initialData[key]) {
                     initialData[key] = JSON.parse(existingData[key]);
@@ -140,38 +318,75 @@ router.get('/initial', apiLimiter, async (req, res) => {
             }
         }
 
-        console.log(`Gửi dữ liệu khởi tạo XSMT cho ngày ${targetDate}, tỉnh ${tinh}:`, initialData);
+        console.log(`✅ Gửi dữ liệu khởi tạo XSMT cho ngày ${targetDate}, tỉnh ${tinh}:`, initialData);
         res.status(200).json(initialData);
     } catch (error) {
-        console.error('Lỗi khi lấy trạng thái ban đầu từ Redis:', error);
+        console.error('❌ Lỗi khi lấy trạng thái ban đầu từ Redis:', error);
         res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
     }
 });
 
-// Endpoint SSE chính
+// Endpoint SSE chính - Tối ưu cho 200+ client
 router.get('/', sseLimiter, async (req, res) => {
     try {
         const { date, station, tinh, simulate } = req.query;
+        console.log('🔌 SSE request:', { date, station, tinh, simulate });
+
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? date
             : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-        const province = provincesByDay[new Date().getDay()]?.[tinh] || provincesByDay[6]?.[tinh];
+
+        // Sử dụng ngày được yêu cầu để xác định tỉnh thay vì ngày hiện tại
+        const targetDateObj = parseDate(targetDate);
+        const dayOfWeek = targetDateObj.getDay();
+        const province = provincesByDay[dayOfWeek]?.[tinh] || provincesByDay[6]?.[tinh];
+
+        console.log('🔍 Xác định tỉnh:', {
+            targetDate,
+            dayOfWeek,
+            tinh,
+            province,
+            availableProvinces: provincesByDay[dayOfWeek] ? Object.keys(provincesByDay[dayOfWeek]) : []
+        });
+
         if (!province || !tinh) {
+            console.warn('⚠️ Tỉnh không hợp lệ cho SSE:', { tinh, province, dayOfWeek });
             return res.status(400).end('Tỉnh không hợp lệ hoặc không được cung cấp.');
         }
         const isSimulate = simulate === 'true';
-        console.log('SSE XSMT:', { targetDate, station, tinh, isSimulate });
+        console.log('🎯 SSE XSMT:', { targetDate, station, tinh, isSimulate });
 
+        // Thiết lập SSE headers
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('Content-Encoding', 'identity');
         res.flushHeaders();
 
+        // Gửi canary message
         res.write('event: canary\ndata: {"message":"Connection established"}\n\n');
         res.flush();
-        console.log(`Gửi canary message cho client XSMT, ngày ${targetDate}, tỉnh ${tinh}`);
+        console.log(`✅ Gửi canary message cho client XSMT, ngày ${targetDate}, tỉnh ${tinh}`);
 
+        // Thêm client vào connection pool
+        const connectionKey = `${targetDate}:${tinh}`;
+        if (!sseConnections.has(connectionKey)) {
+            sseConnections.set(connectionKey, new Set());
+        }
+        sseConnections.get(connectionKey).add(res);
+
+        // Update connection stats
+        connectionStats.set(connectionKey, {
+            count: sseConnections.get(connectionKey).size,
+            lastActivity: Date.now()
+        });
+
+        console.log(`👥 Client mới kết nối SSE cho ${tinh}. Tổng clients: ${sseConnections.get(connectionKey).size}`);
+
+        // Thiết lập Redis checking cho tỉnh này (chỉ một lần)
+        setupRedisChecking(targetDate, tinh, province);
+
+        // Gửi dữ liệu ban đầu
         const initialData = {
             eightPrizes_0: '...',
             sevenPrizes_0: '...',
@@ -202,9 +417,13 @@ router.get('/', sseLimiter, async (req, res) => {
         };
 
         // Lấy dữ liệu thực tế từ Redis
-        let existingData = await redisClient.hGetAll(`kqxs:xsmt:${targetDate}:${tinh}`);
-        const latestData = await redisClient.get(`kqxs:xsmt:${targetDate}:${tinh}:latest`);
-        const metadata = JSON.parse((await redisClient.hGet(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 'metadata')) || '{}');
+        const [existingData, latestData, metadataStr] = await Promise.all([
+            redisManager.getAllHashData(`kqxs:xsmt:${targetDate}:${tinh}`),
+            redisManager.getData(`kqxs:xsmt:${targetDate}:${tinh}:latest`),
+            redisManager.getHashData(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 'metadata')
+        ]);
+
+        const metadata = JSON.parse(metadataStr || '{}');
 
         if (latestData) {
             const parsedLatest = JSON.parse(latestData);
@@ -222,7 +441,7 @@ router.get('/', sseLimiter, async (req, res) => {
             }
         }
 
-        // Gửi dữ liệu ban đầu cho client
+        // Gửi dữ liệu ban đầu cho client này
         const prizeTypes = [
             'eightPrizes_0', 'sevenPrizes_0',
             'sixPrizes_0', 'sixPrizes_1', 'sixPrizes_2',
@@ -231,6 +450,8 @@ router.get('/', sseLimiter, async (req, res) => {
             'threePrizes_0', 'threePrizes_1',
             'secondPrize_0', 'firstPrize_0', 'specialPrize_0'
         ];
+
+        console.log('📤 Gửi dữ liệu ban đầu cho client SSE');
         for (const prizeType of prizeTypes) {
             const prizeData = initialData[prizeType];
             const data = {
@@ -244,155 +465,10 @@ router.get('/', sseLimiter, async (req, res) => {
             };
             res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
             res.flush();
-            console.log(`Gửi dữ liệu ban đầu XSMT từ kho: ${prizeType} = ${prizeData}, tỉnh ${tinh}`);
+            console.log(`📡 Gửi dữ liệu ban đầu XSMT từ kho: ${prizeType} = ${prizeData}, tỉnh ${tinh}`);
         }
 
-        const sendData = async (prizeType, prizeData, additionalData = {}) => {
-            try {
-                if (prizeData === '...') {
-                    const currentData = await redisClient.hGet(`kqxs:xsmt:${targetDate}:${tinh}`, prizeType);
-                    if (currentData && JSON.parse(currentData) !== '...') {
-                        console.warn(`Bỏ qua ghi ${prizeType} = "..." vì đã có giá trị: ${currentData}`);
-                        return;
-                    }
-                }
-                const data = {
-                    [prizeType]: prizeData,
-                    drawDate: targetDate,
-                    tentinh: additionalData.tentinh || province.tentinh,
-                    tinh: additionalData.tinh || province.tinh,
-                    year: additionalData.year || new Date().getFullYear(),
-                    month: additionalData.month || new Date().getMonth() + 1,
-                    lastUpdated: Date.now(),
-                };
-                await redisClient.hSet(`kqxs:xsmt:${targetDate}:${tinh}`, prizeType, JSON.stringify(prizeData));
-                await redisClient.hSet(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 'metadata', JSON.stringify({
-                    ...additionalData,
-                    lastUpdated: data.lastUpdated,
-                }));
-                await redisClient.expire(`kqxs:xsmt:${targetDate}:${tinh}`, 86400);
-                await redisClient.expire(`kqxs:xsmt:${targetDate}:${tinh}:meta`, 86400);
-
-                let latestData = await redisClient.get(`kqxs:xsmt:${targetDate}:${tinh}:latest`);
-                let fullData = latestData ? JSON.parse(latestData) : { ...initialData };
-                fullData[prizeType] = prizeData;
-                fullData.lastUpdated = data.lastUpdated;
-                fullData.tentinh = data.tentinh;
-                fullData.tinh = data.tinh;
-                fullData.year = data.year;
-                fullData.month = data.month;
-                await redisClient.set(`kqxs:xsmt:${targetDate}:${tinh}:latest`, JSON.stringify(fullData));
-                await redisClient.expire(`kqxs:xsmt:${targetDate}:${tinh}:latest`, 86400);
-
-                res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
-                res.flush();
-                console.log(`Gửi SSE XSMT: ${prizeType} = ${prizeData} cho ngày ${targetDate}, tỉnh ${tinh}`);
-
-                if (prizeType === 'sixPrizes_1') {
-                    res.write(`event: full\ndata: ${JSON.stringify(fullData)}\n\n`);
-                    res.flush();
-                    console.log(`Gửi SSE full XSMT cho ngày ${targetDate}, tỉnh ${tinh}:`, fullData);
-                }
-            } catch (error) {
-                console.error(`Lỗi gửi SSE XSMT (${prizeType}):`, error);
-            }
-        };
-
-        const mockData = {
-            eightPrizes_0: '12',
-            sevenPrizes_0: '840',
-            sixPrizes_0: '4567',
-            sixPrizes_1: '8901',
-            sixPrizes_2: '2345',
-            fivePrizes_0: '6789',
-            fourPrizes_0: '1234',
-            fourPrizes_1: '5678',
-            fourPrizes_2: '9012',
-            fourPrizes_3: '3456',
-            fourPrizes_4: '7890',
-            fourPrizes_5: '2345',
-            fourPrizes_6: '6789',
-            threePrizes_0: '0123',
-            threePrizes_1: '4567',
-            secondPrize_0: '89012',
-            firstPrize_0: '34567',
-            specialPrize_0: '12345',
-            lastUpdated: Date.now(),
-        };
-
-        const simulateLiveDraw = async (data) => {
-            const prizeOrder = [
-                { key: 'eightPrizes_0', delay: 500 },
-                { key: 'sevenPrizes_0', delay: 500 },
-                { key: 'sixPrizes_0', delay: 500 },
-                { key: 'sixPrizes_1', delay: 500 },
-                { key: 'sixPrizes_2', delay: 500 },
-                { key: 'fivePrizes_0', delay: 500 },
-                { key: 'fourPrizes_0', delay: 500 },
-                { key: 'fourPrizes_1', delay: 500 },
-                { key: 'fourPrizes_2', delay: 500 },
-                { key: 'fourPrizes_3', delay: 500 },
-                { key: 'fourPrizes_4', delay: 500 },
-                { key: 'fourPrizes_5', delay: 500 },
-                { key: 'fourPrizes_6', delay: 500 },
-                { key: 'threePrizes_0', delay: 500 },
-                { key: 'threePrizes_1', delay: 500 },
-                { key: 'secondPrize_0', delay: 500 },
-                { key: 'firstPrize_0', delay: 500 },
-                { key: 'specialPrize_0', delay: 500 },
-            ];
-            for (const { key, delay } of prizeOrder) {
-                if (data[key]) {
-                    await sendData(key, data[key], { tentinh: province.tentinh, tinh: province.tinh, year: 2025, month: 6 });
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-            }
-        };
-
-        if (isSimulate) {
-            console.log(`Bắt đầu mô phỏng quay số XSMT cho ngày ${targetDate}, tỉnh ${tinh}`);
-            await simulateLiveDraw(mockData);
-            res.end();
-            return;
-        }
-
-        const subscriber = redis.createClient({ url: process.env.REDIS_URL });
-        let retryCount = 0;
-        const maxRetries = 5;
-        const retryDelay = 4000;
-
-        const connectSubscriber = async () => {
-            try {
-                await subscriber.connect();
-                console.log(`Đã kết nối Redis subscriber cho kênh xsmt:${targetDate}:${tinh}`);
-                await subscriber.subscribe(`xsmt:${targetDate}:${tinh}`, async (message) => {
-                    console.log('Nhận Redis message XSMT:', message);
-                    try {
-                        const { prizeType, prizeData, tentinh, tinh, year, month } = JSON.parse(message);
-                        if (prizeType && prizeData) {
-                            await sendData(prizeType, prizeData, { tentinh, tinh, year, month });
-                            retryCount = 0;
-                        } else {
-                            console.warn('Dữ liệu Redis không hợp lệ:', message);
-                        }
-                    } catch (error) {
-                        console.error('Lỗi xử lý Redis message XSMT:', error);
-                    }
-                });
-            } catch (error) {
-                console.error('Lỗi kết nối Redis subscriber:', error);
-                if (retryCount < maxRetries) {
-                    retryCount++;
-                    console.log(`Thử kết nối lại Redis subscriber (lần ${retryCount}/${maxRetries}) sau ${retryDelay}ms`);
-                    setTimeout(connectSubscriber, retryDelay);
-                } else {
-                    console.error('Hết số lần thử kết nối Redis subscriber');
-                }
-            }
-        };
-
-        await connectSubscriber();
-
+        // Keep-alive cho client này
         const keepAlive = setInterval(() => {
             if (res.writableEnded) {
                 clearInterval(keepAlive);
@@ -400,17 +476,41 @@ router.get('/', sseLimiter, async (req, res) => {
             }
             res.write(': keep-alive\n\n');
             res.flush();
-            console.log(`Gửi keep-alive cho client XSMT, ngày ${targetDate}, tỉnh ${tinh}`);
         }, 4000);
 
-        req.on('close', async () => {
+        // Cleanup khi client disconnect
+        req.on('close', () => {
+            console.log(`🔌 Client ngắt kết nối SSE XSMT cho tỉnh ${tinh}`);
             clearInterval(keepAlive);
-            await subscriber.quit();
-            res.end();
-            console.log(`Client ngắt kết nối SSE XSMT cho tỉnh ${tinh}`);
+
+            // Xóa client khỏi connection pool
+            const connections = sseConnections.get(connectionKey);
+            if (connections) {
+                connections.delete(res);
+                console.log(`👥 Client disconnect. Còn lại: ${connections.size} clients cho ${tinh}`);
+
+                // Update connection stats
+                connectionStats.set(connectionKey, {
+                    count: connections.size,
+                    lastActivity: Date.now()
+                });
+
+                // Nếu không còn client nào, cleanup Redis checking
+                if (connections.size === 0) {
+                    const intervalId = redisCheckIntervals.get(connectionKey);
+                    if (intervalId) {
+                        clearInterval(intervalId);
+                        redisCheckIntervals.delete(connectionKey);
+                        console.log(`🧹 Cleanup Redis checking cho ${tinh}`);
+                    }
+                    // Cleanup connection stats
+                    connectionStats.delete(connectionKey);
+                }
+            }
         });
+
     } catch (error) {
-        console.error('Lỗi khi thiết lập SSE XSMT:', error);
+        console.error('❌ Lỗi khi thiết lập SSE XSMT:', error);
         res.status(500).end();
     }
 });

@@ -122,22 +122,48 @@ const mapDayOfWeek = (dayOfWeekNoAccent) => {
 // Danh sách KQXS (trả về tất cả, sắp xếp theo ngày mới nhất)
 router.get('/xsmt', apiLimiter, async (req, res) => {
     try {
-        const cacheKey = `kqxs:xsmt:all`;
+        const { forceRefresh, liveWindow, page = 1, limit = 3 } = req.query;
+        const now = new Date();
+        const vietnamTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+        const vietnamHours = vietnamTime.getHours();
+        const vietnamMinutes = vietnamTime.getMinutes();
+        const isLiveWindow = vietnamHours === 17 && vietnamMinutes >= 10 && vietnamMinutes <= 59;
+        const isPostLiveWindow = vietnamHours > 17 || (vietnamHours === 17 && vietnamMinutes > 59);
+
+        // Cache key với page và limit
+        const cacheKey = `kqxs:xsmt:page:${page}:limit:${limit}:${isLiveWindow ? 'live' : 'normal'}`;
         const cached = await redisClient.get(cacheKey);
-        if (cached) {
+
+        // Logic cache invalidation thông minh
+        const shouldUseCache = cached && !forceRefresh && !liveWindow;
+        const cacheDuration = isLiveWindow ? 60 : 300; // 1 phút cho live, 5 phút cho normal
+
+        if (shouldUseCache) {
+            console.log(`📦 Trả về cached data: ${cacheKey}`);
             return res.status(200).json(JSON.parse(cached));
         }
 
+        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}, page: ${page}, limit: ${limit}`);
+
+        // Tính toán skip cho pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
         const results = await XSMT.find().lean()
-            .sort({ drawDate: -1 });
+            .sort({ drawDate: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
 
         if (!results.length) {
             return res.status(404).json({ error: 'Result not found' });
         }
 
-        await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
+        // Cache với duration phù hợp
+        await redisClient.setEx(cacheKey, cacheDuration, JSON.stringify(results));
+        console.log(`✅ Đã cache data: ${cacheKey}, duration: ${cacheDuration}s, results: ${results.length}`);
+
         res.status(200).json(results);
     } catch (error) {
+        console.error('❌ Lỗi fetch XSMT data:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
@@ -326,6 +352,44 @@ router.get('/xsmt/statistics/tan-suat-lo-cap', statsLimiter, async (req, res) =>
 // Soi cầu bạch thủ XSMT
 router.get('/xsmt/soicau/soi-cau-bach-thu', apiLimiter, async (req, res) => {
     await getBachThuMT(req, res);
+});
+
+// Invalidate cache khi có data mới (được gọi từ scraper)
+router.post('/xsmt/invalidate-cache', async (req, res) => {
+    try {
+        const { date, tinh } = req.body;
+        const cacheKeys = [
+            'kqxs:xsmt:page:*', // Xóa tất cả page cache
+            'kqxs:xsmt:all:live',
+            'kqxs:xsmt:all:normal',
+            `kqxs:xsmt:day:*`,
+            `kqxs:xsmt:tinh:*`
+        ];
+
+        // Xóa tất cả cache liên quan
+        for (const pattern of cacheKeys) {
+            const keys = await redisClient.keys(pattern);
+            if (keys.length > 0) {
+                await redisClient.del(keys);
+                console.log(`🧹 Đã xóa ${keys.length} cache keys với pattern: ${pattern}`);
+            }
+        }
+
+        console.log(`✅ Đã invalidate cache cho date: ${date}, tinh: ${tinh}`);
+        res.status(200).json({ message: 'Cache invalidated successfully' });
+    } catch (error) {
+        console.error('❌ Lỗi invalidate cache:', error);
+        res.status(500).json({ error: 'Failed to invalidate cache' });
+    }
+});
+
+// Health check endpoint
+router.get('/xsmt/health', (req, res) => {
+    res.status(200).json({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        cache: 'active'
+    });
 });
 
 module.exports = router;
