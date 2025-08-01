@@ -243,11 +243,23 @@ router.get('/', apiLimiter, async (req, res) => {
 
 router.get('/xsmb', apiLimiter, async (req, res) => {
     try {
-        const { date, limit = 30 } = req.query;
+        const { date, limit = 30, page = 1, forceRefresh, liveWindow } = req.query;
         const query = { station: 'xsmb' };
         if (date && /^\d{2}-\d{2}-\d{4}$/.test(date)) {
             query.drawDate = parseDate(date);
         }
+
+        // Cache logic với force refresh
+        const cacheKey = `kqxs:xsmb:${date || 'all'}:${limit}:${page}`;
+        const cached = await redisClient.get(cacheKey);
+        const shouldUseCache = cached && !forceRefresh && !liveWindow;
+
+        if (shouldUseCache) {
+            console.log(`📦 Cache hit: ${cacheKey}`);
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}`);
 
         const results = await XSMB.find(query)
             .lean()
@@ -258,7 +270,6 @@ router.get('/xsmb', apiLimiter, async (req, res) => {
             return res.status(404).json({ error: `Không tìm thấy dữ liệu cho xsmb, date: ${date || 'all'}` });
         }
 
-        const cacheKey = `kqxs:xsmb:${date || 'all'}:${limit}`;
         await redisClient.setEx(cacheKey, 60, JSON.stringify(results));
         res.status(200).json(results);
     } catch (error) {

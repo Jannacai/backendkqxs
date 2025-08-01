@@ -122,7 +122,7 @@ const mapDayOfWeek = (dayOfWeekNoAccent) => {
 // Danh sách KQXS (trả về tất cả, sắp xếp theo ngày mới nhất)
 router.get('/xsmt', apiLimiter, async (req, res) => {
     try {
-        const { forceRefresh, liveWindow, page = 1, limit = 3 } = req.query;
+        const { forceRefresh, liveWindow, page = 1, limit = 3, daysPerPage = 3 } = req.query;
         const now = new Date();
         const vietnamTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
         const vietnamHours = vietnamTime.getHours();
@@ -130,8 +130,8 @@ router.get('/xsmt', apiLimiter, async (req, res) => {
         const isLiveWindow = vietnamHours === 17 && vietnamMinutes >= 10 && vietnamMinutes <= 59;
         const isPostLiveWindow = vietnamHours > 17 || (vietnamHours === 17 && vietnamMinutes > 59);
 
-        // Cache key với page và limit
-        const cacheKey = `kqxs:xsmt:page:${page}:limit:${limit}:${isLiveWindow ? 'live' : 'normal'}`;
+        // Cache key với page và daysPerPage
+        const cacheKey = `kqxs:xsmt:page:${page}:daysPerPage:${daysPerPage}:${isLiveWindow ? 'live' : 'normal'}`;
         const cached = await redisClient.get(cacheKey);
 
         // Logic cache invalidation thông minh
@@ -143,23 +143,43 @@ router.get('/xsmt', apiLimiter, async (req, res) => {
             return res.status(200).json(JSON.parse(cached));
         }
 
-        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}, page: ${page}, limit: ${limit}`);
+        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}, page: ${page}, daysPerPage: ${daysPerPage}`);
 
-        // Tính toán skip cho pagination
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-
-        const results = await XSMT.find().lean()
+        // Lấy tất cả unique dates để tính toán pagination theo ngày
+        const allDates = await XSMT.find().lean()
             .sort({ drawDate: -1 })
-            .skip(skip)
-            .limit(parseInt(limit));
+            .distinct('drawDate');
 
-        if (!results.length) {
+        // Sắp xếp lại dates theo thứ tự mới nhất (vì distinct có thể không giữ thứ tự)
+        const sortedDates = allDates.sort((a, b) => new Date(b) - new Date(a));
+
+        // Tính toán skip cho pagination theo ngày
+        const skipDays = (parseInt(page) - 1) * parseInt(daysPerPage);
+        const targetDates = sortedDates.slice(skipDays, skipDays + parseInt(daysPerPage));
+
+        console.log(`📊 Pagination debug:`, {
+            totalDates: sortedDates.length,
+            page: parseInt(page),
+            daysPerPage: parseInt(daysPerPage),
+            skipDays,
+            targetDates: targetDates.map(d => new Date(d).toLocaleDateString('vi-VN')),
+            firstDate: sortedDates[0] ? new Date(sortedDates[0]).toLocaleDateString('vi-VN') : 'N/A',
+            lastDate: sortedDates[sortedDates.length - 1] ? new Date(sortedDates[sortedDates.length - 1]).toLocaleDateString('vi-VN') : 'N/A'
+        });
+
+        if (targetDates.length === 0) {
             return res.status(404).json({ error: 'Result not found' });
         }
 
+        // Lấy tất cả records cho các ngày được chọn
+        const results = await XSMT.find({
+            drawDate: { $in: targetDates }
+        }).lean()
+            .sort({ drawDate: -1, tentinh: 1 });
+
         // Cache với duration phù hợp
         await redisClient.setEx(cacheKey, cacheDuration, JSON.stringify(results));
-        console.log(`✅ Đã cache data: ${cacheKey}, duration: ${cacheDuration}s, results: ${results.length}`);
+        console.log(`✅ Đã cache data: ${cacheKey}, duration: ${cacheDuration}s, results: ${results.length}, dates: ${targetDates.length}`);
 
         res.status(200).json(results);
     } catch (error) {
@@ -390,6 +410,35 @@ router.get('/xsmt/health', (req, res) => {
         timestamp: new Date().toISOString(),
         cache: 'active'
     });
+});
+
+// Debug endpoint để kiểm tra dữ liệu
+router.get('/xsmt/debug', async (req, res) => {
+    try {
+        const allDates = await XSMT.find().lean()
+            .sort({ drawDate: -1 })
+            .distinct('drawDate');
+
+        const sortedDates = allDates.sort((a, b) => new Date(b) - new Date(a));
+
+        const latestRecords = await XSMT.find().lean()
+            .sort({ drawDate: -1 })
+            .limit(10);
+
+        res.status(200).json({
+            totalDates: sortedDates.length,
+            latestDates: sortedDates.slice(0, 10).map(d => new Date(d).toLocaleDateString('vi-VN')),
+            latestRecords: latestRecords.map(r => ({
+                drawDate: new Date(r.drawDate).toLocaleDateString('vi-VN'),
+                tentinh: r.tentinh,
+                tinh: r.tinh
+            })),
+            currentTime: new Date().toLocaleDateString('vi-VN')
+        });
+    } catch (error) {
+        console.error('❌ Lỗi debug endpoint:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
 });
 
 module.exports = router;
