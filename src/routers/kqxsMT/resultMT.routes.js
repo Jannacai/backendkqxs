@@ -37,8 +37,39 @@ const connectRedis = async () => {
 };
 connectRedis().catch(err => console.error('Lỗi kết nối Redis:', err));
 
-// Tính toán trước dữ liệu thống kê (chạy lúc 17h40 mỗi ngày)
-cron.schedule('40 17 * * *', async () => {
+// BỔ SUNG: Helper function để lấy thời gian Việt Nam và kiểm tra 17h35
+const getVietnamTime = () => {
+    const now = new Date();
+    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+};
+const isAfter1735 = () => {
+    const vietnamTime = getVietnamTime();
+    return vietnamTime.getHours() === 17 && vietnamTime.getMinutes() >= 35;
+};
+
+// Tính toán trước dữ liệu thống kê và xóa cache (chạy lúc 17h35 mỗi ngày - ĐỒNG BỘ VỚI FRONTEND)
+cron.schedule('35 17 * * *', async () => {
+    console.log('🕐 17h35 - Bắt đầu xóa cache và tính toán thống kê...');
+    try {
+        const today = new Date().toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        }).replace(/\//g, '-');
+        const cacheKeysToDelete = [
+            `kqxs:xsmt:${today}:30:1`,
+            `kqxs:xsmt:modal:latest`,
+            `kqxs:xsmt:all:30`,
+            `kqxs:all:30`
+        ];
+        for (const key of cacheKeysToDelete) {
+            await redisClient.del(key);
+            console.log(`🗑️ Đã xóa cache: ${key}`);
+        }
+        console.log('✅ Đã xóa cache XSMT để frontend lấy dữ liệu mới');
+    } catch (error) {
+        console.error('❌ Lỗi khi xóa cache:', error);
+    }
     console.log('Tính toán trước thống kê lô gan XSMT...');
     const daysOptions = [6, 7, 14, 30, 60];
     const provinces = ['hue', 'phu-yen', 'dak-lak', 'quang-nam', 'khanh-hoa', 'da-nang', 'binh-dinh', 'quang-tri', 'ninh-thuan', 'gia-lai', 'quang-ngai', 'dak-nong', 'kon-tum'];
@@ -135,7 +166,8 @@ router.get('/xsmt', apiLimiter, async (req, res) => {
         const cached = await redisClient.get(cacheKey);
 
         // Logic cache invalidation thông minh
-        const shouldUseCache = cached && !forceRefresh && !liveWindow;
+        const shouldForceRefresh = isAfter1735(); // Use helper
+        const shouldUseCache = cached && !forceRefresh && !liveWindow && !shouldForceRefresh;
         const cacheDuration = isLiveWindow ? 60 : 300; // 1 phút cho live, 5 phút cho normal
 
         if (shouldUseCache) {
@@ -143,7 +175,7 @@ router.get('/xsmt', apiLimiter, async (req, res) => {
             return res.status(200).json(JSON.parse(cached));
         }
 
-        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}, page: ${page}, daysPerPage: ${daysPerPage}`);
+        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}, page: ${page}, daysPerPage: ${daysPerPage}${shouldForceRefresh ? ' (sau 17h35)' : ''}`);
 
         // Lấy tất cả unique dates để tính toán pagination theo ngày
         const allDates = await XSMT.find().lean()
@@ -204,10 +236,12 @@ router.get('/xsmt/provinces', apiLimiter, async (req, res) => {
 
         const cacheKey = `provinces:${targetDate}`;
         const cached = await redisClient.get(cacheKey);
-        if (cached) {
-            console.log(`Trả về tỉnh từ cache: ${cacheKey}`);
+        const shouldForceRefresh = isAfter1735(); // Use helper
+        if (cached && !shouldForceRefresh) {
+            console.log(`📦 Cache hit cho provinces: ${cacheKey}`);
             return res.status(200).json(JSON.parse(cached));
         }
+        console.log(`🔄 Fetching fresh provinces data: ${cacheKey}${shouldForceRefresh ? ' (sau 17h35)' : ''}`);
 
         const dayOfWeek = moment(targetDate, 'DD/MM/YYYY').format('dddd');
         const schedule = {

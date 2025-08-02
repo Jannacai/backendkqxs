@@ -1,203 +1,312 @@
-// const { createClient } = require('redis');
+const { createClient } = require('redis');
 
-// // Singleton clients và lock để tránh xung đột
-// let redisClient; // Client cho đọc/ghi
-// let subscriberClient; // Client cho Pub/Sub
-// const redisLock = { initializing: false, subscriberInitializing: false };
-// const pendingPromises = []; // Queue cho redisClient
-// const subscriberPendingPromises = []; // Queue cho subscriberClient
+class RedisManager {
+    constructor() {
+        this.client = null;
+        this.connectionPromise = null;
+        this.HEARTBEAT_INTERVAL = 30000; // 30s
+        this.MAX_RETRIES = 5;
+        this.RETRY_DELAY = 3000;
+        this.connectionAttempts = 0;
+        this.lastReconnectTime = 0;
+        this.RECONNECT_COOLDOWN = 10000; // 10s cooldown
+    }
 
-// // Hàm tính thời gian backoff
-// const calculateBackoff = (attempt) => Math.min(1000 * Math.pow(2, attempt - 1), 8000); // Max 8s
+    async initialize(retryCount = 5, delayMs = 3000) {
+        if (this.connectionPromise) return this.connectionPromise;
 
-// // Khởi tạo client đọc/ghi
-// const initializeRedis = async (retryCount = 3) => {
-//     if (redisLock.initializing) {
-//         return new Promise((resolve) => pendingPromises.push(resolve));
-//     }
+        // Kiểm tra cooldown để tránh spam reconnect
+        const now = Date.now();
+        if (now - this.lastReconnectTime < this.RECONNECT_COOLDOWN) {
+            console.log('⏳ Đang trong cooldown, bỏ qua reconnect');
+            return this.client;
+        }
 
-//     if (!redisClient) {
-//         redisLock.initializing = true;
-//         try {
-//             redisClient = createClient({
-//                 url: process.env.REDIS_URL || 'redis://localhost:6379',
-//                 socket: {
-//                     connectTimeout: 10000,
-//                     keepAlive: 1000,
-//                     reconnectStrategy: (retries) => {
-//                         if (retries >= retryCount) {
-//                             console.error('Redis reconnect failed after max retries');
-//                             return false;
-//                         }
-//                         return calculateBackoff(retries + 1);
-//                     },
-//                 },
-//             });
+        this.connectionPromise = (async () => {
+            for (let attempt = 1; attempt <= retryCount; attempt++) {
+                try {
+                    // Cleanup connection cũ nếu có
+                    if (this.client?.isOpen) {
+                        await this.client.quit();
+                    }
 
-//             redisClient.on('error', (err) => console.error('Redis Client Error:', err));
-//             redisClient.on('reconnecting', () => console.log('Redis client attempting to reconnect...'));
-//             redisClient.on('ready', () => {
-//                 console.log('Redis client connected or reconnected successfully');
-//                 while (pendingPromises.length) {
-//                     pendingPromises.shift()(redisClient);
-//                 }
-//             });
+                    this.client = createClient({
+                        url: process.env.REDIS_URL || 'redis://localhost:6379',
+                        socket: {
+                            connectTimeout: 10000,
+                            keepAlive: 1000,
+                            reconnectStrategy: (retries) => {
+                                if (retries > 15) return new Error('Max retries reached');
+                                return Math.min(retries * 200, 5000);
+                            },
+                        },
+                    });
 
-//             for (let attempt = 1; attempt <= retryCount; attempt++) {
-//                 try {
-//                     await redisClient.connect();
-//                     console.log(`Redis client connected on attempt ${attempt}`);
-//                     break;
-//                 } catch (err) {
-//                     console.error(`Attempt ${attempt} failed to connect to Redis:`, err.message);
-//                     if (attempt === retryCount) {
-//                         throw new Error(`Failed to connect to Redis after ${retryCount} attempts`);
-//                     }
-//                     await new Promise(resolve => setTimeout(resolve, calculateBackoff(attempt)));
-//                 }
-//             }
-//         } catch (err) {
-//             console.error('Failed to initialize Redis:', err);
-//             throw err;
-//         } finally {
-//             redisLock.initializing = false;
-//         }
-//     }
+                    this.client.on('error', (err) => {
+                        console.error('Redis Client Error:', err);
+                        this.handleConnectionError(err);
+                    });
 
-//     return redisClient;
-// };
+                    this.client.on('ready', () => {
+                        console.log('✅ Redis connected successfully');
+                        this.connectionAttempts = 0;
+                        this.startHeartbeat();
+                    });
 
-// // Khởi tạo client Pub/Sub
-// const initializeSubscriber = async (retryCount = 3) => {
-//     if (redisLock.subscriberInitializing) {
-//         return new Promise((resolve) => subscriberPendingPromises.push(resolve));
-//     }
+                    this.client.on('end', () => {
+                        console.log('🔌 Redis connection ended');
+                        this.handleConnectionError(new Error('Connection ended'));
+                    });
 
-//     if (!subscriberClient) {
-//         redisLock.subscriberInitializing = true;
-//         try {
-//             subscriberClient = createClient({
-//                 url: process.env.REDIS_URL || 'redis://localhost:6379',
-//                 socket: {
-//                     connectTimeout: 10000,
-//                     keepAlive: 1000,
-//                     reconnectStrategy: (retries) => {
-//                         if (retries >= retryCount) {
-//                             console.error('Redis subscriber reconnect failed after max retries');
-//                             return false;
-//                         }
-//                         return calculateBackoff(retries + 1);
-//                     },
-//                 },
-//             });
+                    await this.client.connect();
+                    this.lastReconnectTime = now;
+                    return this.client;
+                } catch (err) {
+                    console.error(`Attempt ${attempt} failed:`, err.message);
+                    this.connectionAttempts++;
 
-//             subscriberClient.on('error', (err) => console.error('Redis Subscriber Error:', err));
-//             subscriberClient.on('reconnecting', () => console.log('Redis subscriber attempting to reconnect...'));
-//             subscriberClient.on('ready', () => {
-//                 console.log('Redis subscriber connected or reconnected successfully');
-//                 while (subscriberPendingPromises.length) {
-//                     subscriberPendingPromises.shift()(subscriberClient);
-//                 }
-//             });
+                    if (attempt === retryCount) {
+                        console.error('❌ Max Redis connection attempts reached');
+                        throw err;
+                    }
 
-//             for (let attempt = 1; attempt <= retryCount; attempt++) {
-//                 try {
-//                     await subscriberClient.connect();
-//                     console.log(`Redis subscriber connected on attempt ${attempt}`);
-//                     break;
-//                 } catch (err) {
-//                     console.error(`Attempt ${attempt} failed to connect to Redis subscriber:`, err.message);
-//                     if (attempt === retryCount) {
-//                         throw new Error(`Failed to connect to Redis subscriber after ${retryCount} attempts`);
-//                     }
-//                     await new Promise(resolve => setTimeout(resolve, calculateBackoff(attempt)));
-//                 }
-//             }
-//         } catch (err) {
-//             console.error('Failed to initialize Redis subscriber:', err);
-//             throw err;
-//         } finally {
-//             redisLock.subscriberInitializing = false;
-//         }
-//     }
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                }
+            }
+        })();
 
-//     return subscriberClient;
-// };
+        return this.connectionPromise;
+    }
 
-// // Lấy client đọc/ghi
-// const getRedisClient = async (commandTimeout = 5000) => {
-//     if (!redisClient || !redisClient.isOpen) {
-//         try {
-//             await initializeRedis();
-//         } catch (err) {
-//             console.error('getRedisClient failed:', err.message);
-//             throw new Error('Redis unavailable, please try again later');
-//         }
-//     }
+    startHeartbeat() {
+        this.heartbeatInterval = setInterval(async () => {
+            try {
+                await this.client.ping();
+            } catch (err) {
+                console.error('Redis heartbeat failed:', err);
+                this.reconnect();
+            }
+        }, this.HEARTBEAT_INTERVAL);
+    }
 
-//     if (!redisClient.isReady) {
-//         await new Promise(resolve => setTimeout(resolve, 1000));
-//         return getRedisClient(commandTimeout);
-//     }
+    async reconnect() {
+        clearInterval(this.heartbeatInterval);
+        this.connectionPromise = null;
+        if (this.client?.isOpen) await this.client.quit();
+        this.client = null;
+        return this.initialize();
+    }
 
-//     redisClient.options.commandTimeout = commandTimeout;
-//     return redisClient;
-// };
+    async getClient() {
+        if (!this.client || !this.client.isReady) {
+            if (!this.connectionPromise) {
+                await this.initialize();
+            } else {
+                await this.connectionPromise;
+            }
+        }
+        return this.client;
+    }
 
-// // Lấy client Pub/Sub
-// const getSubscriberClient = async (commandTimeout = 5000) => {
-//     if (!subscriberClient || !subscriberClient.isOpen) {
-//         try {
-//             await initializeSubscriber();
-//         } catch (err) {
-//             console.error('getSubscriberClient failed:', err.message);
-//             throw new Error('Redis subscriber unavailable, please try again later');
-//         }
-//     }
+    // Thêm hàm để publish sự kiện SSE
+    async publishSSEEvent(date, prizeType, prizeData, additionalData = {}) {
+        try {
+            const client = await this.getClient();
+            const message = JSON.stringify({
+                prizeType,
+                prizeData,
+                tentinh: additionalData.tentinh || 'Miền Bắc',
+                tinh: additionalData.tinh || 'MB',
+                year: additionalData.year || new Date().getFullYear(),
+                month: additionalData.month || new Date().getMonth() + 1,
+                timestamp: Date.now()
+            });
 
-//     if (!subscriberClient.isReady) {
-//         await new Promise(resolve => setTimeout(resolve, 1000));
-//         return getSubscriberClient(commandTimeout);
-//     }
+            await client.publish(`xsmb:${date}`, message);
+            console.log(`📡 Published SSE event: ${prizeType} = ${prizeData} for XSMB`);
+            return true;
+        } catch (error) {
+            console.error('❌ Lỗi publish SSE event:', error);
+            return false;
+        }
+    }
 
-//     subscriberClient.options.commandTimeout = commandTimeout;
-//     return subscriberClient;
-// };
+    // Thêm hàm để cập nhật dữ liệu và publish sự kiện
+    async updateLotteryData(date, prizeType, prizeData, additionalData = {}) {
+        try {
+            const client = await this.getClient();
 
-// // Đóng cả hai client
-// const closeRedis = async () => {
-//     if (redisClient && redisClient.isOpen) {
-//         try {
-//             await redisClient.quit();
-//             console.log('Redis client disconnected');
-//         } catch (err) {
-//             console.error('Failed to disconnect Redis client:', err);
-//         } finally {
-//             redisClient = null;
-//         }
-//     }
+            // Batch operations để tối ưu performance
+            const pipeline = client.multi();
 
-//     if (subscriberClient && subscriberClient.isOpen) {
-//         try {
-//             await subscriberClient.quit();
-//             console.log('Redis subscriber disconnected');
-//         } catch (err) {
-//             console.error('Failed to disconnect Redis subscriber:', err);
-//         } finally {
-//             subscriberClient = null;
-//         }
-//     }
-// };
+            // Cập nhật dữ liệu vào Redis
+            pipeline.hSet(`kqxs:${date}`, prizeType, JSON.stringify(prizeData));
+            pipeline.expire(`kqxs:${date}`, 86400);
 
-// // Đóng Redis khi server dừng
-// process.on('SIGINT', async () => {
-//     await closeRedis();
-//     process.exit(0);
-// });
+            // Cập nhật metadata
+            const metadata = {
+                ...additionalData,
+                lastUpdated: Date.now(),
+            };
+            pipeline.hSet(`kqxs:${date}:meta`, 'metadata', JSON.stringify(metadata));
+            pipeline.expire(`kqxs:${date}:meta`, 86400);
 
-// process.on('SIGTERM', async () => {
-//     await closeRedis();
-//     process.exit(0);
-// });
+            // Cập nhật latest data
+            let latestData = await client.get(`kqxs:${date}:latest`);
+            let fullData = latestData ? JSON.parse(latestData) : {};
+            fullData[prizeType] = prizeData;
+            fullData.lastUpdated = Date.now();
+            fullData.tentinh = additionalData.tentinh || 'Miền Bắc';
+            fullData.tinh = additionalData.tinh || 'MB';
+            fullData.year = additionalData.year || new Date().getFullYear();
+            fullData.month = additionalData.month || new Date().getMonth() + 1;
 
-// module.exports = { getRedisClient, getSubscriberClient, initializeRedis, initializeSubscriber, closeRedis };
+            pipeline.set(`kqxs:${date}:latest`, JSON.stringify(fullData));
+            pipeline.expire(`kqxs:${date}:latest`, 86400);
+
+            // Execute batch operations
+            await pipeline.exec();
+
+            // Publish sự kiện SSE
+            await this.publishSSEEvent(date, prizeType, prizeData, additionalData);
+
+            console.log(`✅ Updated lottery data: ${prizeType} = ${prizeData} for XSMB`);
+            return true;
+        } catch (error) {
+            console.error('❌ Lỗi update lottery data:', error);
+
+            // Thử reconnect nếu là connection error
+            if (error.message.includes('ECONNRESET') || error.message.includes('ENOTFOUND')) {
+                console.log('🔄 Thử reconnect Redis...');
+                await this.reconnect();
+            }
+
+            return false;
+        }
+    }
+
+    async close() {
+        try {
+            // Clear heartbeat interval
+            if (this.heartbeatInterval) {
+                clearInterval(this.heartbeatInterval);
+                this.heartbeatInterval = null;
+            }
+
+            // Close Redis connection
+            if (this.client?.isOpen) {
+                await this.client.quit();
+                console.log('🔌 Redis connection closed gracefully');
+            }
+
+            // Reset state
+            this.client = null;
+            this.connectionPromise = null;
+            this.connectionAttempts = 0;
+            this.lastReconnectTime = 0;
+        } catch (error) {
+            console.error('❌ Lỗi khi đóng Redis connection:', error);
+        }
+    }
+
+    // Thêm method để cleanup memory
+    cleanup() {
+        this.close();
+    }
+
+    handleConnectionError(error) {
+        console.error('Redis connection error:', error.message);
+        if (this.connectionAttempts < this.MAX_RETRIES) {
+            setTimeout(() => {
+                this.reconnect();
+            }, this.RETRY_DELAY);
+        }
+    }
+
+    // Thêm method để lấy dữ liệu từ Redis (tương thích với xsmbLiveRoutes)
+    async getData(key) {
+        try {
+            const client = await this.getClient();
+            return await client.get(key);
+        } catch (error) {
+            console.error('❌ Lỗi getData:', error);
+            return null;
+        }
+    }
+
+    // Thêm method để lấy hash data
+    async getHashData(key, field) {
+        try {
+            const client = await this.getClient();
+            return await client.hGet(key, field);
+        } catch (error) {
+            console.error('❌ Lỗi getHashData:', error);
+            return null;
+        }
+    }
+
+    // Thêm method để lấy tất cả hash data
+    async getAllHashData(key) {
+        try {
+            const client = await this.getClient();
+            return await client.hGetAll(key);
+        } catch (error) {
+            console.error('❌ Lỗi getAllHashData:', error);
+            return {};
+        }
+    }
+
+    // Thêm method để set data với TTL
+    async setDataWithTTL(key, value, ttl = 86400) {
+        try {
+            const client = await this.getClient();
+            await client.setEx(key, ttl, JSON.stringify(value));
+            return true;
+        } catch (error) {
+            console.error('❌ Lỗi setDataWithTTL:', error);
+            return false;
+        }
+    }
+
+    // Thêm method để set hash data
+    async setHashData(key, field, value) {
+        try {
+            const client = await this.getClient();
+            await client.hSet(key, field, JSON.stringify(value));
+            return true;
+        } catch (error) {
+            console.error('❌ Lỗi setHashData:', error);
+            return false;
+        }
+    }
+}
+
+// Singleton instance
+const redisManager = new RedisManager();
+
+process.on('SIGINT', async () => {
+    console.log('🛑 Received SIGINT, cleaning up...');
+    await redisManager.cleanup();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('🛑 Received SIGTERM, cleaning up...');
+    await redisManager.cleanup();
+    process.exit(0);
+});
+
+// Thêm handler cho uncaught exceptions
+process.on('uncaughtException', async (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    await redisManager.cleanup();
+    process.exit(1);
+});
+
+process.on('unhandledRejection', async (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    await redisManager.cleanup();
+    process.exit(1);
+});
+
+module.exports = redisManager;

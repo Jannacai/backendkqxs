@@ -30,9 +30,48 @@ const parseDate = (dateStr) => {
     return new Date(year, month - 1, day);
 };
 
-// Tính toán trước dữ liệu thống kê (chạy lúc 18:30 mỗi ngày)
-cron.schedule('40 18 * * *', async () => {
-    console.log('Tính toán trước thống kê lô gan...');
+// BỔ SUNG: Helper function để lấy thời gian Việt Nam và kiểm tra 18h35
+const getVietnamTime = () => {
+    const now = new Date();
+    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+};
+
+const isAfter1835 = () => {
+    const vietnamTime = getVietnamTime();
+    return vietnamTime.getHours() === 18 && vietnamTime.getMinutes() >= 35;
+};
+
+// Tính toán trước dữ liệu thống kê và xóa cache (chạy lúc 18:35 mỗi ngày - ĐỒNG BỘ VỚI FRONTEND)
+cron.schedule('35 18 * * *', async () => {
+    console.log('🕐 18h35 - Bắt đầu xóa cache và tính toán thống kê...');
+
+    // BỔ SUNG: Xóa cache cho XSMB để frontend lấy dữ liệu mới
+    try {
+        const today = new Date().toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        }).replace(/\//g, '-');
+
+        // Xóa cache cho ngày hôm nay
+        const cacheKeysToDelete = [
+            `kqxs:xsmb:${today}:30:1`,
+            `kqxs:xsmb:modal:latest`,
+            `kqxs:xsmb:all:30`,
+            `kqxs:all:30`
+        ];
+
+        for (const key of cacheKeysToDelete) {
+            await redisClient.del(key);
+            console.log(`🗑️ Đã xóa cache: ${key}`);
+        }
+
+        console.log('✅ Đã xóa cache XSMB để frontend lấy dữ liệu mới');
+    } catch (error) {
+        console.error('❌ Lỗi khi xóa cache:', error);
+    }
+
+    console.log('📊 Tính toán trước thống kê lô gan...');
     const daysOptions = [6, 7, 14, 30, 60];
     for (const days of daysOptions) {
         const result = await getLoGanStats({ query: { days, station: 'xsmb' } }, { status: () => ({ json: () => { } }) });
@@ -40,7 +79,7 @@ cron.schedule('40 18 * * *', async () => {
         await redisClient.setEx(cacheKey, 86400, JSON.stringify(result));
     }
 
-    console.log('Tính toán trước thống kê giải đặc biệt...');
+    console.log('📊 Tính toán trước thống kê giải đặc biệt...');
     const specialDaysOptions = [10, 20, 30, 60, 90, 180, 270, 365];
     for (const days of specialDaysOptions) {
         const result = await getSpecialPrizeStats({ query: { days, station: 'xsmb' } }, { status: () => ({ json: () => { } }) });
@@ -48,7 +87,7 @@ cron.schedule('40 18 * * *', async () => {
         await redisClient.setEx(cacheKey, 86400, JSON.stringify(result));
     }
 
-    console.log('Tính toán trước thống kê đầu đuôi...');
+    console.log('📊 Tính toán trước thống kê đầu đuôi...');
     const dauDuoiDaysOptions = [30, 60, 90, 120, 180, 365];
     for (const days of dauDuoiDaysOptions) {
         const result = await getDauDuoiStats({ query: { days } }, { status: () => ({ json: () => { } }) });
@@ -56,12 +95,14 @@ cron.schedule('40 18 * * *', async () => {
         await redisClient.setEx(cacheKey, 86400, JSON.stringify(result));
     }
 
-    console.log('Tính toán trước thống kê đầu đuôi theo ngày...');
+    console.log('📊 Tính toán trước thống kê đầu đuôi theo ngày...');
     for (const days of dauDuoiDaysOptions) {
         const result = await getDauDuoiStatsByDate({ query: { days } }, { status: () => ({ json: () => { } }) });
         const cacheKey = `dauDuoiByDate:${days}:all`;
         await redisClient.setEx(cacheKey, 86400, JSON.stringify(result));
     }
+
+    console.log('✅ Hoàn thành xóa cache và tính toán thống kê lúc 18h35');
 });
 
 // Rate limiter
@@ -240,7 +281,98 @@ router.get('/', apiLimiter, async (req, res) => {
         res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
     }
 });
+// API mới cho modal XSMB - lấy chỉ 1 bản ghi mới nhất
+router.get('/xsmb/latest', apiLimiter, async (req, res) => {
+    try {
+        const { date } = req.query;
+        const query = { station: 'xsmb' };
 
+        // Nếu không có date hoặc date không hợp lệ, lấy bản mới nhất
+        if (!date || !/^\d{2}-\d{2}-\d{4}$/.test(date)) {
+            console.log('🔄 Lấy bản ghi XSMB mới nhất (không theo ngày cụ thể)');
+        } else {
+            query.drawDate = parseDate(date);
+            console.log(`🔄 Lấy bản ghi XSMB cho ngày: ${date}`);
+        }
+
+        // TỐI ƯU: Cache key cho modal với kiểm tra thời gian
+        const cacheKey = `kqxs:xsmb:modal:${date || 'latest'}`;
+        const cached = await redisClient.get(cacheKey);
+
+        // Kiểm tra nếu sau 18h35 thì force refresh
+        const shouldForceRefresh = isAfter1835();
+
+        if (cached && !shouldForceRefresh) {
+            console.log(`📦 Cache hit cho modal XSMB: ${cacheKey}`);
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        console.log(`🔄 Fetching fresh data cho modal XSMB: ${cacheKey}${shouldForceRefresh ? ' (sau 18h35)' : ''}`);
+
+        // Chỉ lấy 1 bản ghi mới nhất
+        const result = await XSMB.findOne(query)
+            .lean()
+            .sort({ drawDate: -1 });
+
+        if (!result) {
+            console.log('❌ Không tìm thấy dữ liệu XSMB');
+            return res.status(404).json({ error: `Không tìm thấy dữ liệu XSMB cho ngày ${date || 'mới nhất'}` });
+        }
+
+        console.log(`✅ Tìm thấy dữ liệu XSMB: ${result.drawDate}`);
+
+        // Transform dữ liệu từ array sang format field riêng biệt
+        const transformedResult = {
+            ...result,
+            // Đặc biệt
+            specialPrize_0: result.specialPrize && result.specialPrize[0] ? result.specialPrize[0] : '...',
+            // Giải nhất
+            firstPrize_0: result.firstPrize && result.firstPrize[0] ? result.firstPrize[0] : '...',
+            // Giải nhì
+            secondPrize_0: result.secondPrize && result.secondPrize[0] ? result.secondPrize[0] : '...',
+            secondPrize_1: result.secondPrize && result.secondPrize[1] ? result.secondPrize[1] : '...',
+            // Giải ba
+            threePrizes_0: result.threePrizes && result.threePrizes[0] ? result.threePrizes[0] : '...',
+            threePrizes_1: result.threePrizes && result.threePrizes[1] ? result.threePrizes[1] : '...',
+            threePrizes_2: result.threePrizes && result.threePrizes[2] ? result.threePrizes[2] : '...',
+            threePrizes_3: result.threePrizes && result.threePrizes[3] ? result.threePrizes[3] : '...',
+            threePrizes_4: result.threePrizes && result.threePrizes[4] ? result.threePrizes[4] : '...',
+            threePrizes_5: result.threePrizes && result.threePrizes[5] ? result.threePrizes[5] : '...',
+            // Giải tư
+            fourPrizes_0: result.fourPrizes && result.fourPrizes[0] ? result.fourPrizes[0] : '...',
+            fourPrizes_1: result.fourPrizes && result.fourPrizes[1] ? result.fourPrizes[1] : '...',
+            fourPrizes_2: result.fourPrizes && result.fourPrizes[2] ? result.fourPrizes[2] : '...',
+            fourPrizes_3: result.fourPrizes && result.fourPrizes[3] ? result.fourPrizes[3] : '...',
+            // Giải năm
+            fivePrizes_0: result.fivePrizes && result.fivePrizes[0] ? result.fivePrizes[0] : '...',
+            fivePrizes_1: result.fivePrizes && result.fivePrizes[1] ? result.fivePrizes[1] : '...',
+            fivePrizes_2: result.fivePrizes && result.fivePrizes[2] ? result.fivePrizes[2] : '...',
+            fivePrizes_3: result.fivePrizes && result.fivePrizes[3] ? result.fivePrizes[3] : '...',
+            fivePrizes_4: result.fivePrizes && result.fivePrizes[4] ? result.fivePrizes[4] : '...',
+            fivePrizes_5: result.fivePrizes && result.fivePrizes[5] ? result.fivePrizes[5] : '...',
+            // Giải sáu
+            sixPrizes_0: result.sixPrizes && result.sixPrizes[0] ? result.sixPrizes[0] : '...',
+            sixPrizes_1: result.sixPrizes && result.sixPrizes[1] ? result.sixPrizes[1] : '...',
+            sixPrizes_2: result.sixPrizes && result.sixPrizes[2] ? result.sixPrizes[2] : '...',
+            // Giải bảy
+            sevenPrizes_0: result.sevenPrizes && result.sevenPrizes[0] ? result.sevenPrizes[0] : '...',
+            sevenPrizes_1: result.sevenPrizes && result.sevenPrizes[1] ? result.sevenPrizes[1] : '...',
+            sevenPrizes_2: result.sevenPrizes && result.sevenPrizes[2] ? result.sevenPrizes[2] : '...',
+            sevenPrizes_3: result.sevenPrizes && result.sevenPrizes[3] ? result.sevenPrizes[3] : '...',
+            // Thêm lastUpdated để frontend biết đây là dữ liệu mới
+            lastUpdated: Date.now()
+        };
+
+        console.log(`✅ Transform dữ liệu XSMB thành công: ${Object.keys(transformedResult).length} fields`);
+
+        // Cache trong 5 phút cho modal
+        await redisClient.setEx(cacheKey, 300, JSON.stringify(transformedResult));
+        res.status(200).json(transformedResult);
+    } catch (error) {
+        console.error('Lỗi khi lấy dữ liệu XSMB cho modal:', error);
+        res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
+    }
+});
 router.get('/xsmb', apiLimiter, async (req, res) => {
     try {
         const { date, limit = 30, page = 1, forceRefresh, liveWindow } = req.query;
@@ -249,17 +381,21 @@ router.get('/xsmb', apiLimiter, async (req, res) => {
             query.drawDate = parseDate(date);
         }
 
-        // Cache logic với force refresh
+        // TỐI ƯU: Cache logic với force refresh và kiểm tra thời gian
         const cacheKey = `kqxs:xsmb:${date || 'all'}:${limit}:${page}`;
         const cached = await redisClient.get(cacheKey);
-        const shouldUseCache = cached && !forceRefresh && !liveWindow;
+
+        // Kiểm tra nếu sau 18h35 thì force refresh
+        const shouldForceRefresh = isAfter1835();
+
+        const shouldUseCache = cached && !forceRefresh && !liveWindow && !shouldForceRefresh;
 
         if (shouldUseCache) {
             console.log(`📦 Cache hit: ${cacheKey}`);
             return res.status(200).json(JSON.parse(cached));
         }
 
-        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}`);
+        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}${shouldForceRefresh ? ' (sau 18h35)' : ''}`);
 
         const results = await XSMB.find(query)
             .lean()
@@ -403,6 +539,8 @@ router.get('/xsmb/statistics/tan-suat-lo-cap', statsLimiter, async (req, res) =>
 router.get('/xsmb/soicau/soi-cau-bach-thu', statsLimiter, async (req, res) => {
     await getBachThuMB(req, res);
 });
+
+
 
 router.post('/telegram', async (req, res) => {
     try {
