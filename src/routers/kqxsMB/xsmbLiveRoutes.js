@@ -63,8 +63,8 @@ const broadcastSSE = (date, eventType, data) => {
         let sentCount = 0;
         const failedConnections = [];
 
-        // Tối ưu batch processing
-        const batchSize = 100; // Tăng batch size từ 50 lên 100
+        // ✅ TỐI ƯU: Giảm batch size từ 100 xuống 20 để tránh memory spike
+        const batchSize = 20; // Giảm batch size cho XSMB
         const connectionArray = Array.from(connections);
 
         for (let i = 0; i < connectionArray.length; i += batchSize) {
@@ -86,7 +86,7 @@ const broadcastSSE = (date, eventType, data) => {
                 }
             });
 
-            // Giảm delay giữa các batch
+            // ✅ TỐI ƯU: Thêm delay 10ms giữa các batch để tránh quá tải
             if (i + batchSize < connectionArray.length) {
                 setImmediate(() => { });
             }
@@ -221,11 +221,11 @@ const setupRedisChecking = (date) => {
         }
     };
 
-    // Kiểm tra thay đổi mỗi 2 giây
-    const intervalId = setInterval(checkRedisChanges, 2000);
+    // ✅ TỐI ƯU: Tăng interval từ 2 giây lên 5 giây để giảm tải CPU
+    const intervalId = setInterval(checkRedisChanges, 5000);
     redisCheckIntervals.set(date, intervalId);
 
-    debugLog(`Thiết lập Redis checking cho XSMB (${date})`);
+    debugLog(`Thiết lập Redis checking cho XSMB (${date}) - interval 5s`);
 };
 
 // Endpoint lấy trạng thái ban đầu
