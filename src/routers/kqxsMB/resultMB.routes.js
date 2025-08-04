@@ -30,46 +30,47 @@ const parseDate = (dateStr) => {
     return new Date(year, month - 1, day);
 };
 
-// BỔ SUNG: Helper function để lấy thời gian Việt Nam và kiểm tra 18h35
+// BỔ SUNG: Helper function để lấy thời gian Việt Nam
 const getVietnamTime = () => {
     const now = new Date();
     return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
 };
 
-const isAfter1835 = () => {
-    const vietnamTime = getVietnamTime();
-    return vietnamTime.getHours() === 18 && vietnamTime.getMinutes() >= 35;
-};
+// ✅ TỐI ƯU: Loại bỏ isAfter1835 vì không cần thiết nữa
+// const isAfter1835 = () => {
+//     const vietnamTime = getVietnamTime();
+//     return vietnamTime.getHours() === 18 && vietnamTime.getMinutes() >= 35;
+// };
 
-// Tính toán trước dữ liệu thống kê và xóa cache (chạy lúc 18:35 mỗi ngày - ĐỒNG BỘ VỚI FRONTEND)
+// ✅ TỐI ƯU: Chỉ tính toán thống kê, không xóa cache (vì đã có cơ chế clear cache khi LiveResult ẩn đi)
 cron.schedule('35 18 * * *', async () => {
-    console.log('🕐 18h35 - Bắt đầu xóa cache và tính toán thống kê...');
+    console.log('🕐 18h35 - Bắt đầu tính toán thống kê...');
 
-    // BỔ SUNG: Xóa cache cho XSMB để frontend lấy dữ liệu mới
-    try {
-        const today = new Date().toLocaleDateString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-        }).replace(/\//g, '-');
+    // ✅ TỐI ƯU: Loại bỏ xóa cache vì đã có cơ chế clear cache khi LiveResult ẩn đi
+    // try {
+    //     const today = new Date().toLocaleDateString('vi-VN', {
+    //         day: '2-digit',
+    //         month: '2-digit',
+    //         year: 'numeric',
+    // }).replace(/\//g, '-');
 
-        // Xóa cache cho ngày hôm nay
-        const cacheKeysToDelete = [
-            `kqxs:xsmb:${today}:30:1`,
-            `kqxs:xsmb:modal:latest`,
-            `kqxs:xsmb:all:30`,
-            `kqxs:all:30`
-        ];
+    //     // Xóa cache cho ngày hôm nay
+    //     const cacheKeysToDelete = [
+    //         `kqxs:xsmb:${today}:30:1`,
+    //         `kqxs:xsmb:modal:latest`,
+    //         `kqxs:xsmb:all:30`,
+    //         `kqxs:all:30`
+    //     ];
 
-        for (const key of cacheKeysToDelete) {
-            await redisClient.del(key);
-            console.log(`🗑️ Đã xóa cache: ${key}`);
-        }
+    //     for (const key of cacheKeysToDelete) {
+    //         await redisClient.del(key);
+    //         console.log(`🗑️ Đã xóa cache: ${key}`);
+    //     }
 
-        console.log('✅ Đã xóa cache XSMB để frontend lấy dữ liệu mới');
-    } catch (error) {
-        console.error('❌ Lỗi khi xóa cache:', error);
-    }
+    //     console.log('✅ Đã xóa cache XSMB để frontend lấy dữ liệu mới');
+    // } catch (error) {
+    //     console.error('❌ Lỗi khi xóa cache:', error);
+    // }
 
     console.log('📊 Tính toán trước thống kê lô gan...');
     const daysOptions = [6, 7, 14, 30, 60];
@@ -102,7 +103,7 @@ cron.schedule('35 18 * * *', async () => {
         await redisClient.setEx(cacheKey, 86400, JSON.stringify(result));
     }
 
-    console.log('✅ Hoàn thành xóa cache và tính toán thống kê lúc 18h35');
+    console.log('✅ Hoàn thành tính toán thống kê lúc 18h35');
 });
 
 // Rate limiter
@@ -299,15 +300,12 @@ router.get('/xsmb/latest', apiLimiter, async (req, res) => {
         const cacheKey = `kqxs:xsmb:modal:${date || 'latest'}`;
         const cached = await redisClient.get(cacheKey);
 
-        // Kiểm tra nếu sau 18h35 thì force refresh
-        const shouldForceRefresh = isAfter1835();
-
-        if (cached && !shouldForceRefresh) {
+        if (cached) {
             console.log(`📦 Cache hit cho modal XSMB: ${cacheKey}`);
             return res.status(200).json(JSON.parse(cached));
         }
 
-        console.log(`🔄 Fetching fresh data cho modal XSMB: ${cacheKey}${shouldForceRefresh ? ' (sau 18h35)' : ''}`);
+        console.log(`🔄 Fetching fresh data cho modal XSMB: ${cacheKey}`);
 
         // Chỉ lấy 1 bản ghi mới nhất
         const result = await XSMB.findOne(query)
@@ -385,17 +383,14 @@ router.get('/xsmb', apiLimiter, async (req, res) => {
         const cacheKey = `kqxs:xsmb:${date || 'all'}:${limit}:${page}`;
         const cached = await redisClient.get(cacheKey);
 
-        // Kiểm tra nếu sau 18h35 thì force refresh
-        const shouldForceRefresh = isAfter1835();
-
-        const shouldUseCache = cached && !forceRefresh && !liveWindow && !shouldForceRefresh;
+        const shouldUseCache = cached && !forceRefresh && !liveWindow;
 
         if (shouldUseCache) {
             console.log(`📦 Cache hit: ${cacheKey}`);
             return res.status(200).json(JSON.parse(cached));
         }
 
-        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}${shouldForceRefresh ? ' (sau 18h35)' : ''}`);
+        console.log(`🔄 Fetching fresh data từ MongoDB: ${cacheKey}`);
 
         const results = await XSMB.find(query)
             .lean()

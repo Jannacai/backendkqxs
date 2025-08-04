@@ -9,14 +9,38 @@ const sseConnections = new Map(); // { `${date}`: Set<res> }
 const redisCheckIntervals = new Map(); // { `${date}`: intervalId }
 const connectionStats = new Map(); // { `${date}`: { count: number, lastActivity: number } }
 
-// Hàm monitoring connections
+// BỔ SUNG: Performance monitoring cho backend
+const performanceMonitor = {
+    startTime: Date.now(),
+    metrics: {
+        sseConnections: 0,
+        broadcasts: 0,
+        redisOperations: 0,
+        errors: 0
+    },
+    log: (metric, value = 1) => {
+        performanceMonitor.metrics[metric] += value;
+        if (performanceMonitor.metrics[metric] % 50 === 0) {
+            console.log(`📊 Backend Performance XSMB - ${metric}: ${performanceMonitor.metrics[metric]}`);
+        }
+    }
+};
+
+// BỔ SUNG: Tối ưu console.log - chỉ log quan trọng
+const debugLog = (message, data = null) => {
+    if (process.env.NODE_ENV === 'development') {
+        console.log(`🔍 Backend XSMB: ${message}`, data);
+    }
+};
+
+// Hàm monitoring connections tối ưu
 const monitorConnections = () => {
     const now = Date.now();
     const timeout = 5 * 60 * 1000; // 5 phút
 
     for (const [key, stats] of connectionStats.entries()) {
         if (now - stats.lastActivity > timeout) {
-            console.log(`🧹 Cleanup inactive connection: ${key}`);
+            debugLog(`Cleanup inactive connection: ${key}`);
             const connections = sseConnections.get(key);
             if (connections) {
                 connections.clear();
@@ -30,7 +54,7 @@ const monitorConnections = () => {
 // Chạy monitoring mỗi phút
 setInterval(monitorConnections, 60000);
 
-// Hàm broadcast SSE cho tất cả client với batch processing
+// Hàm broadcast SSE tối ưu cho 200+ client
 const broadcastSSE = (date, eventType, data) => {
     const connections = sseConnections.get(date);
 
@@ -39,8 +63,8 @@ const broadcastSSE = (date, eventType, data) => {
         let sentCount = 0;
         const failedConnections = [];
 
-        // Batch processing để tối ưu performance
-        const batchSize = 50;
+        // Tối ưu batch processing
+        const batchSize = 100; // Tăng batch size từ 50 lên 100
         const connectionArray = Array.from(connections);
 
         for (let i = 0; i < connectionArray.length; i += batchSize) {
@@ -56,12 +80,13 @@ const broadcastSSE = (date, eventType, data) => {
                         failedConnections.push(res);
                     }
                 } catch (error) {
-                    console.error(`❌ Lỗi gửi SSE cho client:`, error);
+                    debugLog(`Lỗi gửi SSE cho client:`, error);
                     failedConnections.push(res);
+                    performanceMonitor.log('errors');
                 }
             });
 
-            // Small delay giữa các batch để tránh blocking
+            // Giảm delay giữa các batch
             if (i + batchSize < connectionArray.length) {
                 setImmediate(() => { });
             }
@@ -78,7 +103,8 @@ const broadcastSSE = (date, eventType, data) => {
             lastActivity: Date.now()
         });
 
-        console.log(`📡 Broadcast SSE: ${eventType} cho ${sentCount}/${connections.size} clients của XSMB`);
+        performanceMonitor.log('broadcasts');
+        debugLog(`Broadcast SSE: ${eventType} cho ${sentCount}/${connections.size} clients`);
     }
 };
 
@@ -155,7 +181,7 @@ const setupRedisChecking = (date) => {
             if (now - lastCleanupTime > CLEANUP_INTERVAL) {
                 lastSentData.clear();
                 lastCleanupTime = now;
-                console.log(`🧹 Cleanup lastSentData cho XSMB`);
+                debugLog(`Cleanup lastSentData cho XSMB`);
             }
 
             const currentData = await redisManager.getAllHashData(`kqxs:${date}`);
@@ -168,7 +194,7 @@ const setupRedisChecking = (date) => {
                 const dataKey = `${key}:${parsedValue}`;
 
                 if (parsedValue !== '...' && parsedValue !== '***' && !lastSentData.has(dataKey)) {
-                    console.log(`📡 Phát hiện thay đổi Redis: ${key} = ${parsedValue} cho XSMB`);
+                    debugLog(`Phát hiện thay đổi Redis: ${key} = ${parsedValue} cho XSMB`);
 
                     const sseData = {
                         [key]: parsedValue,
@@ -189,7 +215,7 @@ const setupRedisChecking = (date) => {
             console.error(`❌ Lỗi kiểm tra Redis changes cho XSMB:`, error);
             // Thử reconnect Redis nếu cần
             if (error.message.includes('ECONNRESET') || error.message.includes('ENOTFOUND')) {
-                console.log(`🔄 Thử reconnect Redis cho XSMB`);
+                debugLog(`Thử reconnect Redis cho XSMB`);
                 connectRedis().catch(err => console.error('Lỗi reconnect Redis:', err));
             }
         }
@@ -199,20 +225,20 @@ const setupRedisChecking = (date) => {
     const intervalId = setInterval(checkRedisChanges, 2000);
     redisCheckIntervals.set(date, intervalId);
 
-    console.log(`🔧 Thiết lập Redis checking cho XSMB (${date})`);
+    debugLog(`Thiết lập Redis checking cho XSMB (${date})`);
 };
 
 // Endpoint lấy trạng thái ban đầu
 router.get('/initial', apiLimiter, async (req, res) => {
     try {
         const { date, station } = req.query;
-        console.log('📡 /initial request:', { date, station });
+        debugLog('Initial request:', { date, station });
 
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? date
             : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
 
-        console.log('🔍 Lấy dữ liệu từ Redis cho:', { targetDate });
+        debugLog('Fetching data from Redis for:', { targetDate });
 
         // Lấy dữ liệu từ Redis với Promise.all để tối ưu
         const [existingData, latestData, metadataStr] = await Promise.all([
@@ -226,7 +252,7 @@ router.get('/initial', apiLimiter, async (req, res) => {
         });
 
         const metadata = JSON.parse(metadataStr || '{}');
-        console.log('📊 Dữ liệu Redis:', {
+        debugLog('Redis data:', {
             existingDataKeys: Object.keys(existingData),
             hasLatestData: !!latestData,
             metadata
@@ -273,7 +299,7 @@ router.get('/initial', apiLimiter, async (req, res) => {
 
         if (latestData) {
             const parsedLatest = JSON.parse(latestData);
-            console.log('📡 Sử dụng latest data cho XSMB', parsedLatest);
+            debugLog('Using latest data for XSMB', parsedLatest);
             for (const key of Object.keys(parsedLatest)) {
                 if (initialData[key]) {
                     initialData[key] = parsedLatest[key];
@@ -281,7 +307,7 @@ router.get('/initial', apiLimiter, async (req, res) => {
             }
             initialData.lastUpdated = parsedLatest.lastUpdated || Date.now();
         } else {
-            console.log('📡 Sử dụng existing data cho XSMB');
+            debugLog('Using existing data for XSMB');
             for (const key of Object.keys(existingData)) {
                 if (initialData[key]) {
                     initialData[key] = JSON.parse(existingData[key]);
@@ -289,10 +315,10 @@ router.get('/initial', apiLimiter, async (req, res) => {
             }
         }
 
-        console.log(`✅ Gửi dữ liệu khởi tạo XSMB cho ngày ${targetDate}:`, initialData);
+        debugLog(`Sending initial XSMB data for ${targetDate}:`, initialData);
         res.status(200).json(initialData);
     } catch (error) {
-        console.error('❌ Lỗi khi lấy trạng thái ban đầu từ Redis:', error);
+        console.error('❌ Error fetching initial state from Redis:', error);
         res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau.' });
     }
 });
@@ -301,16 +327,16 @@ router.get('/initial', apiLimiter, async (req, res) => {
 router.get('/', sseLimiter, async (req, res) => {
     try {
         const { date, station, simulate } = req.query;
-        console.log('🔌 SSE request:', { date, station, simulate });
+        debugLog('SSE request:', { date, station, simulate });
 
         const targetDate = date && /^\d{2}-\d{2}-\d{4}$/.test(date)
             ? date
             : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
 
-        console.log('🎯 SSE XSMB:', { targetDate, station });
+        debugLog('SSE XSMB:', { targetDate, station });
 
         const isSimulate = simulate === 'true';
-        console.log('🎯 SSE XSMB:', { targetDate, station, isSimulate });
+        debugLog('SSE XSMB:', { targetDate, station, isSimulate });
 
         // Thiết lập SSE headers
         res.setHeader('Content-Type', 'text/event-stream');
@@ -322,7 +348,7 @@ router.get('/', sseLimiter, async (req, res) => {
         // Gửi canary message
         res.write('event: canary\ndata: {"message":"Connection established"}\n\n');
         res.flush();
-        console.log(`✅ Gửi canary message cho client XSMB, ngày ${targetDate}`);
+        debugLog(`Sent canary message to XSMB client, date ${targetDate}`);
 
         // Thêm client vào connection pool
         if (!sseConnections.has(targetDate)) {
@@ -336,7 +362,7 @@ router.get('/', sseLimiter, async (req, res) => {
             lastActivity: Date.now()
         });
 
-        console.log(`👥 Client mới kết nối SSE cho XSMB. Tổng clients: ${sseConnections.get(targetDate).size}`);
+        debugLog(`New SSE client connected for XSMB. Total clients: ${sseConnections.get(targetDate).size}`);
 
         // Thiết lập Redis checking cho ngày này (chỉ một lần)
         setupRedisChecking(targetDate);
@@ -417,7 +443,7 @@ router.get('/', sseLimiter, async (req, res) => {
             'maDB', 'specialPrize_0'
         ];
 
-        console.log('📤 Gửi dữ liệu ban đầu cho client SSE');
+        debugLog('Sending initial data to SSE client');
         for (const prizeType of prizeTypes) {
             const prizeData = initialData[prizeType];
             const data = {
@@ -431,7 +457,7 @@ router.get('/', sseLimiter, async (req, res) => {
             };
             res.write(`event: ${prizeType}\ndata: ${JSON.stringify(data)}\n\n`);
             res.flush();
-            console.log(`📡 Gửi dữ liệu ban đầu XSMB từ kho: ${prizeType} = ${prizeData}`);
+            debugLog(`Sent initial XSMB data from Redis: ${prizeType} = ${prizeData}`);
         }
 
         // Keep-alive cho client này
@@ -446,14 +472,14 @@ router.get('/', sseLimiter, async (req, res) => {
 
         // Cleanup khi client disconnect
         req.on('close', () => {
-            console.log(`🔌 Client ngắt kết nối SSE XSMB cho ngày ${targetDate}`);
+            debugLog(`Client disconnected SSE XSMB for ${targetDate}`);
             clearInterval(keepAlive);
 
             // Xóa client khỏi connection pool
             const connections = sseConnections.get(targetDate);
             if (connections) {
                 connections.delete(res);
-                console.log(`👥 Client disconnect. Còn lại: ${connections.size} clients cho XSMB`);
+                debugLog(`Client disconnect. Remaining: ${connections.size} clients for XSMB`);
 
                 // Update connection stats
                 connectionStats.set(targetDate, {
@@ -467,7 +493,7 @@ router.get('/', sseLimiter, async (req, res) => {
                     if (intervalId) {
                         clearInterval(intervalId);
                         redisCheckIntervals.delete(targetDate);
-                        console.log(`🧹 Cleanup Redis checking cho XSMB`);
+                        debugLog(`Cleanup Redis checking for XSMB`);
                     }
                     // Cleanup connection stats
                     connectionStats.delete(targetDate);
@@ -476,7 +502,7 @@ router.get('/', sseLimiter, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Lỗi khi thiết lập SSE XSMB:', error);
+        console.error('❌ Error setting up SSE XSMB:', error);
         res.status(500).end();
     }
 });
