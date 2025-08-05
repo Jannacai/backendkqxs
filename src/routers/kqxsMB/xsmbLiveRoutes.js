@@ -30,11 +30,6 @@ const performanceMonitor = {
 const debugLog = (message, data = null) => {
     if (process.env.NODE_ENV === 'development') {
         console.log(`🔍 Backend XSMB: ${message}`, data);
-    } else if (process.env.NODE_ENV === 'production') {
-        // Production logging - chỉ log errors và critical events
-        if (message.includes('Error') || message.includes('Failed') || message.includes('Critical')) {
-            console.error(`🚨 Production XSMB: ${message}`, data);
-        }
     }
 };
 
@@ -68,9 +63,8 @@ const broadcastSSE = (date, eventType, data) => {
         let sentCount = 0;
         const failedConnections = [];
 
-        // ✅ TỐI ƯU: Dynamic batch processing dựa trên số lượng connections
-        const connectionCount = connections.size;
-        const batchSize = connectionCount > 200 ? 50 : connectionCount > 100 ? 75 : 100; // Adaptive batch size
+        // Tối ưu batch processing
+        const batchSize = 100; // Tăng batch size từ 50 lên 100
         const connectionArray = Array.from(connections);
 
         for (let i = 0; i < connectionArray.length; i += batchSize) {
