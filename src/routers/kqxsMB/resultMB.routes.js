@@ -259,7 +259,44 @@ router.get('/xsmb/soicau/bach-thu/range', statsLimiter, async (req, res) => {
 // Các route hiện có
 router.get('/', apiLimiter, async (req, res) => {
     try {
-        const { limit = 30 } = req.query;
+        const { limit = 30, date } = req.query;
+
+        // ✅ THÊM: Hỗ trợ query theo ngày
+        if (date) {
+            console.log(`🔄 Lấy dữ liệu XSMB theo ngày: ${date}`);
+
+            if (!/^\d{2}-\d{2}-\d{4}$/.test(date)) {
+                return res.status(400).json({ error: 'Định dạng ngày không hợp lệ. Vui lòng sử dụng DD-MM-YYYY.' });
+            }
+
+            const query = {
+                station: 'xsmb',
+                drawDate: parseDate(date)
+            };
+
+            const cacheKey = `kqxs:xsmb:date:${date}`;
+            const cached = await redisClient.get(cacheKey);
+
+            if (cached) {
+                console.log(`📦 Cache hit cho XSMB theo ngày: ${date}`);
+                return res.status(200).json(JSON.parse(cached));
+            }
+
+            const results = await XSMB.find(query)
+                .lean()
+                .sort({ drawDate: -1 })
+                .limit(parseInt(limit || 30));
+
+            if (!results.length) {
+                return res.status(404).json({ error: `Không tìm thấy dữ liệu XSMB cho ngày ${date}` });
+            }
+
+            await redisClient.setEx(cacheKey, 3600, JSON.stringify(results)); // Cache 1 giờ
+            res.status(200).json(results);
+            return;
+        }
+
+        // Logic cũ cho tất cả dữ liệu
         const cacheKey = `kqxs:all:${limit}`;
         const cached = await redisClient.get(cacheKey);
         if (cached) {

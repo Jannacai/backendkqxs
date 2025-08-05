@@ -30,6 +30,11 @@ const performanceMonitor = {
 const debugLog = (message, data = null) => {
     if (process.env.NODE_ENV === 'development') {
         console.log(`🔍 Backend XSMB: ${message}`, data);
+    } else if (process.env.NODE_ENV === 'production') {
+        // Production logging - chỉ log errors và critical events
+        if (message.includes('Error') || message.includes('Failed') || message.includes('Critical')) {
+            console.error(`🚨 Production XSMB: ${message}`, data);
+        }
     }
 };
 
@@ -63,8 +68,9 @@ const broadcastSSE = (date, eventType, data) => {
         let sentCount = 0;
         const failedConnections = [];
 
-        // ✅ TỐI ƯU: Giảm batch size từ 100 xuống 20 để tránh memory spike
-        const batchSize = 20; // Giảm batch size cho XSMB
+        // ✅ TỐI ƯU: Dynamic batch processing dựa trên số lượng connections
+        const connectionCount = connections.size;
+        const batchSize = connectionCount > 200 ? 50 : connectionCount > 100 ? 75 : 100; // Adaptive batch size
         const connectionArray = Array.from(connections);
 
         for (let i = 0; i < connectionArray.length; i += batchSize) {
@@ -86,7 +92,7 @@ const broadcastSSE = (date, eventType, data) => {
                 }
             });
 
-            // ✅ TỐI ƯU: Thêm delay 10ms giữa các batch để tránh quá tải
+            // Giảm delay giữa các batch
             if (i + batchSize < connectionArray.length) {
                 setImmediate(() => { });
             }
@@ -221,11 +227,11 @@ const setupRedisChecking = (date) => {
         }
     };
 
-    // ✅ TỐI ƯU: Tăng interval từ 2 giây lên 5 giây để giảm tải CPU
-    const intervalId = setInterval(checkRedisChanges, 5000);
+    // Kiểm tra thay đổi mỗi 2 giây
+    const intervalId = setInterval(checkRedisChanges, 2000);
     redisCheckIntervals.set(date, intervalId);
 
-    debugLog(`Thiết lập Redis checking cho XSMB (${date}) - interval 5s`);
+    debugLog(`Thiết lập Redis checking cho XSMB (${date})`);
 };
 
 // Endpoint lấy trạng thái ban đầu

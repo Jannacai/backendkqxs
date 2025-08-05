@@ -39,8 +39,8 @@ const broadcastSSE = (date, tinh, eventType, data) => {
         let sentCount = 0;
         const failedConnections = [];
 
-        // ✅ TỐI ƯU: Giảm batch size từ 20 xuống 10 để tránh memory spike
-        const batchSize = 10; // Giảm batch size cho XSMT
+        // Batch processing để tối ưu performance - TỐI ƯU CUỐI CÙNG
+        const batchSize = 100; // Tăng batch size cho XSMT
         const connectionArray = Array.from(connections);
 
         for (let i = 0; i < connectionArray.length; i += batchSize) {
@@ -61,10 +61,9 @@ const broadcastSSE = (date, tinh, eventType, data) => {
                 }
             });
 
-            // ✅ TỐI ƯU: Tăng delay giữa các batch để tránh treo
+            // Giảm delay giữa các batch để tối ưu performance
             if (i + batchSize < connectionArray.length) {
-                // Sử dụng setTimeout thay vì setImmediate để có delay
-                setTimeout(() => { }, 20); // Tăng từ 10ms lên 20ms
+                setImmediate(() => { });
             }
         }
 
@@ -186,17 +185,8 @@ const setupRedisChecking = (date, tinh, province) => {
 
             if (Object.keys(currentData).length === 0) return;
 
-            // ✅ TỐI ƯU: Giới hạn số lượng changes được xử lý mỗi lần để tránh quá tải
-            let processedChanges = 0;
-            const maxChangesPerCheck = 5; // Giới hạn 5 changes mỗi lần check
-
             // So sánh với dữ liệu hiện tại và broadcast SSE nếu có thay đổi
             for (const [key, value] of Object.entries(currentData)) {
-                if (processedChanges >= maxChangesPerCheck) {
-                    console.log(`⚠️ Đã đạt giới hạn ${maxChangesPerCheck} changes cho ${tinh}, bỏ qua các changes còn lại`);
-                    break;
-                }
-
                 const parsedValue = JSON.parse(value);
                 const dataKey = `${key}:${parsedValue}`;
 
@@ -216,7 +206,6 @@ const setupRedisChecking = (date, tinh, province) => {
                     // Broadcast cho tất cả client của tỉnh này
                     broadcastSSE(date, tinh, key, sseData);
                     lastSentData.add(dataKey);
-                    processedChanges++;
                 }
             }
         } catch (error) {
@@ -229,11 +218,11 @@ const setupRedisChecking = (date, tinh, province) => {
         }
     };
 
-    // ✅ TỐI ƯU: Tăng interval từ 5 giây lên 8 giây để giảm tải CPU hơn nữa
-    const intervalId = setInterval(checkRedisChanges, 8000);
+    // Kiểm tra thay đổi mỗi 2 giây
+    const intervalId = setInterval(checkRedisChanges, 2000);
     redisCheckIntervals.set(connectionKey, intervalId);
 
-    console.log(`🔧 Thiết lập Redis checking cho ${tinh} (${date}) - interval 8s`);
+    console.log(`🔧 Thiết lập Redis checking cho ${tinh} (${date})`);
 };
 
 // Endpoint lấy trạng thái ban đầu
